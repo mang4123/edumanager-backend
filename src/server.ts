@@ -2,13 +2,13 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
-import { errorHandler } from '@/middleware/errorHandler';
-import { authRoutes } from '@/routes/auth';
-import { professorRoutes } from '@/routes/professor';
-import { alunoRoutes } from '@/routes/aluno';
-import { aulaRoutes } from '@/routes/aula';
-import { exercicioRoutes } from '@/routes/exercicio';
-import { financeiroRoutes } from '@/routes/financeiro';
+import { errorHandler } from './middleware/errorHandler';
+import { authRoutes } from './routes/auth';
+import { professorRoutes } from './routes/professor';
+import { alunoRoutes } from './routes/aluno';
+import { aulaRoutes } from './routes/aula';
+import { exercicioRoutes } from './routes/exercicio';
+import { financeiroRoutes } from './routes/financeiro';
 
 // Carrega variáveis de ambiente
 dotenv.config();

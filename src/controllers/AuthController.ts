@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
-import { supabase, supabaseAdmin } from '@/config/supabase';
-import { createError } from '@/middleware/errorHandler';
-import { AuthRequest } from '@/middleware/auth';
+import { supabase, supabaseAdmin } from '../config/supabase';
+import { createError } from '../middleware/errorHandler';
+import { AuthRequest } from '../middleware/auth';
 
 export class AuthController {
   // Registrar Professor
