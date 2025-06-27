@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: edumanager-backend
+    env: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3001
+      - key: SUPABASE_URL
+        value: https://qyaorhetkrgmkrtzjpvm.supabase.co
+      - key: SUPABASE_ANON_KEY
+        value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF5YW9yaGV0a3JnbWtydHpqcHZtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA3NzQ5NDEsImV4cCI6MjA2NjM1MDk0MX0.vhWjLl9P5vh-LuVBV9aoQPor2vxJFR0ysUrp6SEjRSM
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF5YW9yaGV0a3JnbWtydHpqcHZtIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MDc3NDk0MSwiZXhwIjoyMDY2MzUwOTQxfQ.uucHm0k1FGOYuf1OCmsPhv1ZY3HpxF3fH-prddTrdpU
+      - key: JWT_SECRET
+        value: edumanager_super_secret_jwt_key_2024_production
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      - key: FRONTEND_URL
+        value: https://lovable.dev 
