@@ -2,6 +2,9 @@ import { Request, Response, NextFunction } from 'express';
 import { supabase, supabaseAdmin } from '../config/supabase';
 import { createError } from '../middleware/errorHandler';
 import { AuthRequest } from '../middleware/auth';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import { v4 as uuidv4 } from 'uuid';
 
 export class AuthController {
   // Registro genérico baseado no role
@@ -34,52 +37,41 @@ export class AuthController {
       // Mapear areaAtuacao para especialidade se necessário
       const especialidadeFinal = especialidade || areaAtuacao;
 
-      console.log('=== REGISTRO PROFESSOR ===');
+      console.log('=== REGISTRO PROFESSOR (SEM SUPABASE AUTH) ===');
       console.log('Dados recebidos:', { email, nome, especialidadeFinal, telefone });
 
       if (!email || !password || !nome) {
         throw createError('Email, senha e nome são obrigatórios', 400);
       }
 
-      // Criar usuário no Supabase Auth usando SERVICE_ROLE_KEY
-      console.log('=== TENTANDO CRIAR USUÁRIO NO SUPABASE AUTH ===');
-      console.log('Email:', email);
-      console.log('Password length:', password?.length);
-      
-      const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-        email,
-        password,
-        email_confirm: true, // Confirmar email automaticamente
-      });
+      // Verificar se email já existe
+      const { data: existingUser } = await supabaseAdmin
+        .from('profiles')
+        .select('email')
+        .eq('email', email)
+        .single();
 
-      console.log('=== RESULTADO SUPABASE AUTH ===');
-      console.log('Auth Data:', authData);
-      console.log('Auth Error:', authError);
-
-      if (authError) {
-        console.error('=== ERRO DETALHADO SUPABASE AUTH ===');
-        console.error('Error message:', authError.message);
-        console.error('Error code:', authError.status);
-        console.error('Error details:', authError);
-        throw createError(`Erro ao criar conta: ${authError.message}`, 400);
+      if (existingUser) {
+        throw createError('Email já está em uso', 400);
       }
 
-      if (!authData.user) {
-        throw createError('Falha ao criar usuário', 400);
-      }
+      // Gerar ID único e hash da senha
+      const userId = uuidv4();
+      const saltRounds = 12;
+      const hashedPassword = await bcrypt.hash(password, saltRounds);
 
-      // Criar perfil do professor
-      console.log('=== TENTANDO CRIAR PERFIL DO PROFESSOR ===');
+      console.log('=== CRIANDO PERFIL PROFESSOR DIRETAMENTE ===');
       const profileData = {
-        id: authData.user.id,
+        id: userId,
         email,
         nome,
         tipo: 'professor',
         especialidade: especialidadeFinal,
         telefone,
+        password_hash: hashedPassword,
         created_at: new Date().toISOString(),
       };
-      console.log('Profile data:', profileData);
+      console.log('Profile data:', { ...profileData, password_hash: '[HIDDEN]' });
       
       const { error: profileError } = await supabaseAdmin
         .from('profiles')
@@ -94,20 +86,30 @@ export class AuthController {
         console.error('Error code:', profileError.code);
         console.error('Error details:', profileError.details);
         console.error('Error hint:', profileError.hint);
-        
-        // Se falhou criar o perfil, deletar o usuário do auth
-        await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
         throw createError(`Erro ao criar perfil: ${profileError.message}`, 400);
       }
+
+      // Gerar JWT token
+      const token = jwt.sign(
+        { 
+          userId, 
+          email, 
+          tipo: 'professor' 
+        },
+        process.env.JWT_SECRET || 'fallback-secret',
+        { expiresIn: '24h' }
+      );
 
       res.status(201).json({
         message: 'Professor registrado com sucesso',
         user: {
-          id: authData.user.id,
-          email: authData.user.email,
+          id: userId,
+          email,
           nome,
-          tipo: 'professor'
-        }
+          tipo: 'professor',
+          especialidade: especialidadeFinal
+        },
+        access_token: token
       });
     } catch (error) {
       next(error);
@@ -119,8 +121,22 @@ export class AuthController {
     try {
       const { email, password, nome, telefone, professor_id } = req.body;
 
+      console.log('=== REGISTRO ALUNO (SEM SUPABASE AUTH) ===');
+      console.log('Dados recebidos:', { email, nome, telefone, professor_id });
+
       if (!email || !password || !nome) {
         throw createError('Email, senha e nome são obrigatórios', 400);
+      }
+
+      // Verificar se email já existe
+      const { data: existingUser } = await supabaseAdmin
+        .from('profiles')
+        .select('email')
+        .eq('email', email)
+        .single();
+
+      if (existingUser) {
+        throw createError('Email já está em uso', 400);
       }
 
       // Verificar se o professor existe (apenas se professor_id foi fornecido)
@@ -137,51 +153,53 @@ export class AuthController {
         }
       }
 
-      // Criar usuário no Supabase Auth usando SERVICE_ROLE_KEY
-      console.log('=== TENTANDO CRIAR ALUNO NO SUPABASE AUTH ===');
-      console.log('Email:', email);
-      
-      const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+      // Gerar ID único e hash da senha
+      const userId = uuidv4();
+      const saltRounds = 12;
+      const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+      console.log('=== CRIANDO PERFIL ALUNO DIRETAMENTE ===');
+      const profileData = {
+        id: userId,
         email,
-        password,
-        email_confirm: true, // Confirmar email automaticamente
-      });
+        nome,
+        tipo: 'aluno',
+        telefone,
+        professor_id, // Pode ser null
+        password_hash: hashedPassword,
+        created_at: new Date().toISOString(),
+      };
 
-      if (authError) {
-        throw createError(`Erro ao criar conta: ${authError.message}`, 400);
-      }
-
-      if (!authData.user) {
-        throw createError('Falha ao criar usuário', 400);
-      }
-
-      // Criar perfil do aluno
       const { error: profileError } = await supabaseAdmin
         .from('profiles')
-        .insert({
-          id: authData.user.id,
-          email,
-          nome,
-          tipo: 'aluno',
-          telefone,
-          professor_id, // Pode ser null
-          created_at: new Date().toISOString(),
-        });
+        .insert(profileData);
 
       if (profileError) {
-        // Se falhou criar o perfil, deletar o usuário do auth
-        await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
+        console.error('=== ERRO DETALHADO PERFIL ALUNO ===');
+        console.error('Error:', profileError);
         throw createError(`Erro ao criar perfil: ${profileError.message}`, 400);
       }
+
+      // Gerar JWT token
+      const token = jwt.sign(
+        { 
+          userId, 
+          email, 
+          tipo: 'aluno' 
+        },
+        process.env.JWT_SECRET || 'fallback-secret',
+        { expiresIn: '24h' }
+      );
 
       res.status(201).json({
         message: 'Aluno registrado com sucesso',
         user: {
-          id: authData.user.id,
-          email: authData.user.email,
+          id: userId,
+          email,
           nome,
           tipo: 'aluno'
-        }
+        },
+        access_token: token
       });
     } catch (error) {
       next(error);
@@ -193,35 +211,51 @@ export class AuthController {
     try {
       const { email, password } = req.body;
 
+      console.log('=== LOGIN (SEM SUPABASE AUTH) ===');
+      console.log('Email:', email);
+
       if (!email || !password) {
         throw createError('Email e senha são obrigatórios', 400);
       }
 
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      // Buscar usuário na tabela profiles
+      const { data: profile, error: profileError } = await supabaseAdmin
+        .from('profiles')
+        .select('*')
+        .eq('email', email)
+        .single();
 
-      if (error) {
+      if (profileError || !profile) {
+        console.log('Usuário não encontrado:', email);
         throw createError('Credenciais inválidas', 401);
       }
 
-      // Buscar perfil do usuário
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', data.user.id)
-        .single();
+      // Verificar senha
+      const isPasswordValid = await bcrypt.compare(password, profile.password_hash);
+
+      if (!isPasswordValid) {
+        console.log('Senha incorreta para:', email);
+        throw createError('Credenciais inválidas', 401);
+      }
+
+      // Gerar JWT token
+      const token = jwt.sign(
+        { 
+          userId: profile.id, 
+          email: profile.email, 
+          tipo: profile.tipo 
+        },
+        process.env.JWT_SECRET || 'fallback-secret',
+        { expiresIn: '24h' }
+      );
+
+      // Remover password_hash da resposta
+      const { password_hash, ...userProfile } = profile;
 
       res.json({
         message: 'Login realizado com sucesso',
-        user: {
-          id: data.user.id,
-          email: data.user.email,
-          ...profile
-        },
-        access_token: data.session?.access_token,
-        refresh_token: data.session?.refresh_token,
+        user: userProfile,
+        access_token: token
       });
     } catch (error) {
       next(error);
