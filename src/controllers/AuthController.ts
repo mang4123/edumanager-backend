@@ -107,6 +107,7 @@ export class AuthController {
           email,
           nome,
           tipo: 'professor',
+          role: 'professor', // Adicionar campo role para compatibilidade com frontend
           especialidade: especialidadeFinal
         },
         access_token: token
@@ -197,7 +198,8 @@ export class AuthController {
           id: userId,
           email,
           nome,
-          tipo: 'aluno'
+          tipo: 'aluno',
+          role: 'aluno' // Adicionar campo role para compatibilidade com frontend
         },
         access_token: token
       });
@@ -249,12 +251,15 @@ export class AuthController {
         { expiresIn: '24h' }
       );
 
-      // Remover password_hash da resposta
+      // Remover password_hash da resposta e adicionar role
       const { password_hash, ...userProfile } = profile;
 
       res.json({
         message: 'Login realizado com sucesso',
-        user: userProfile,
+        user: {
+          ...userProfile,
+          role: profile.tipo // Adicionar campo role para compatibilidade com frontend
+        },
         access_token: token
       });
     } catch (error) {
