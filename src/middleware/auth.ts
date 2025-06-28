@@ -24,29 +24,37 @@ export const authenticateToken = async (
       throw createError('Token de acesso requerido', 401);
     }
 
-    // Verifica o token com o Supabase
-    const { data: { user }, error } = await supabase.auth.getUser(token);
+    // Verifica o JWT próprio (não usa mais Supabase Auth)
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret') as any;
 
-    if (error || !user) {
+    if (!decoded || !decoded.userId || !decoded.email) {
       throw createError('Token inválido ou expirado', 401);
     }
 
-    // Busca informações adicionais do usuário
-    const { data: profile } = await supabase
+    // Busca informações do usuário na tabela profiles
+    const { data: profile, error } = await supabase
       .from('profiles')
-      .select('tipo')
-      .eq('id', user.id)
+      .select('*')
+      .eq('id', decoded.userId)
       .single();
 
+    if (error || !profile) {
+      throw createError('Usuário não encontrado', 401);
+    }
+
     req.user = {
-      id: user.id,
-      email: user.email!,
-      tipo: profile?.tipo || 'aluno'
+      id: profile.id,
+      email: profile.email,
+      tipo: profile.tipo
     };
 
     next();
-  } catch (error) {
-    next(error);
+  } catch (error: any) {
+    if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
+      next(createError('Token inválido ou expirado', 401));
+    } else {
+      next(error);
+    }
   }
 };
 
