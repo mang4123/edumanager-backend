@@ -110,7 +110,8 @@ export class AuthController {
           role: 'professor', // Adicionar campo role para compatibilidade com frontend
           especialidade: especialidadeFinal
         },
-        access_token: token
+        access_token: token,
+        token: token // Adicionar token com nome alternativo para compatibilidade
       });
     } catch (error) {
       next(error);
@@ -201,7 +202,8 @@ export class AuthController {
           tipo: 'aluno',
           role: 'aluno' // Adicionar campo role para compatibilidade com frontend
         },
-        access_token: token
+        access_token: token,
+        token: token // Adicionar token com nome alternativo para compatibilidade
       });
     } catch (error) {
       next(error);
@@ -260,7 +262,8 @@ export class AuthController {
           ...userProfile,
           role: profile.tipo // Adicionar campo role para compatibilidade com frontend
         },
-        access_token: token
+        access_token: token,
+        token: token // Adicionar token com nome alternativo para compatibilidade
       });
     } catch (error) {
       next(error);
