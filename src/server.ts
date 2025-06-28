@@ -170,6 +170,159 @@ app.get('/api/duvidas', authenticateToken, (req, res) => {
   });
 });
 
+// === ROTAS ESPECÍFICAS PARA AÇÕES ===
+// Responder dúvida
+app.post('/api/duvidas/:id/responder', authenticateToken, (req, res) => {
+  const { id } = req.params;
+  const { resposta } = req.body;
+  
+  console.log('=== RESPONDER DÚVIDA (ROTA DIRETA) ===');
+  console.log('Dúvida ID:', id);
+  console.log('Resposta:', resposta);
+  
+  res.json({
+    message: 'Dúvida respondida com sucesso',
+    data: {
+      duvidaId: parseInt(id),
+      resposta,
+      dataResposta: new Date().toISOString(),
+      status: 'respondida'
+    }
+  });
+});
+
+// Criar exercício (rota direta)
+app.post('/api/exercicios/criar', authenticateToken, (req, res) => {
+  console.log('=== CRIAR EXERCÍCIO (ROTA DIRETA) ===');
+  console.log('Dados recebidos:', req.body);
+  
+  const { titulo, descricao, materia, prazo, alunos } = req.body;
+  
+  res.json({
+    message: 'Exercício criado com sucesso',
+    data: {
+      id: Math.floor(Math.random() * 1000) + 300,
+      titulo,
+      descricao,
+      materia,
+      prazo,
+      alunos: alunos || [],
+      status: 'criado',
+      dataCriacao: new Date().toISOString()
+    }
+  });
+});
+
+// Enviar exercício (rota direta)
+app.post('/api/exercicios/:id/enviar', authenticateToken, (req, res) => {
+  const { id } = req.params;
+  console.log('=== ENVIAR EXERCÍCIO (ROTA DIRETA) ===');
+  console.log('Exercício ID:', id);
+  console.log('Dados:', req.body);
+  
+  res.json({
+    message: 'Exercício enviado com sucesso',
+    data: {
+      exercicioId: parseInt(id),
+      status: 'enviado',
+      dataEnvio: new Date().toISOString()
+    }
+  });
+});
+
+// Ver exercício (rota direta)
+app.get('/api/exercicios/:id', authenticateToken, (req, res) => {
+  const { id } = req.params;
+  console.log('=== VER EXERCÍCIO (ROTA DIRETA) ===');
+  console.log('Exercício ID:', id);
+  
+  res.json({
+    message: 'Detalhes do exercício',
+    data: {
+      id: parseInt(id),
+      titulo: 'Exercício de Matemática',
+      descricao: 'Resolver equações propostas',
+      materia: 'Matemática',
+      status: 'ativo',
+      alunos: [
+        { nome: 'João Silva', status: 'pendente' },
+        { nome: 'Maria Santos', status: 'entregue' }
+      ]
+    }
+  });
+});
+
+// Nova aula (rotas alternativas)
+app.post('/api/aulas/nova', authenticateToken, (req, res) => {
+  console.log('=== NOVA AULA (ROTA ALTERNATIVA) ===');
+  console.log('Dados recebidos:', req.body);
+  
+  res.json({
+    message: 'Aula criada com sucesso',
+    data: {
+      id: Math.floor(Math.random() * 1000) + 400,
+      ...req.body,
+      status: 'agendada',
+      dataCriacao: new Date().toISOString()
+    }
+  });
+});
+
+// Agendar aula (rota específica)
+app.post('/api/agendar-aula', authenticateToken, (req, res) => {
+  console.log('=== AGENDAR AULA (ROTA ESPECÍFICA) ===');
+  console.log('Dados recebidos:', req.body);
+  
+  res.json({
+    message: 'Aula agendada com sucesso',
+    data: {
+      id: Math.floor(Math.random() * 1000) + 500,
+      ...req.body,
+      status: 'agendada',
+      dataAgendamento: new Date().toISOString()
+    }
+  });
+});
+
+// Contato com aluno (rota direta)
+app.post('/api/alunos/:id/contato', authenticateToken, (req, res) => {
+  const { id } = req.params;
+  console.log('=== CONTATO ALUNO (ROTA DIRETA) ===');
+  console.log('Aluno ID:', id);
+  console.log('Dados:', req.body);
+  
+  res.json({
+    message: 'Contato enviado com sucesso',
+    data: {
+      alunoId: parseInt(id),
+      status: 'enviado',
+      dataEnvio: new Date().toISOString()
+    }
+  });
+});
+
+// Histórico do aluno (rota direta)
+app.get('/api/alunos/:id/historico', authenticateToken, (req, res) => {
+  const { id } = req.params;
+  console.log('=== HISTÓRICO ALUNO (ROTA DIRETA) ===');
+  console.log('Aluno ID:', id);
+  
+  res.json({
+    message: 'Histórico do aluno',
+    data: {
+      alunoId: parseInt(id),
+      aulas: [
+        { data: '2024-01-15', materia: 'Matemática', nota: 8.5 },
+        { data: '2024-01-12', materia: 'Física', nota: 9.0 }
+      ],
+      estatisticas: {
+        totalAulas: 2,
+        mediaNotas: 8.75
+      }
+    }
+  });
+});
+
 // Middleware de tratamento de erros
 app.use(errorHandler);
 

@@ -6,168 +6,130 @@ const router = Router();
 // Todas as rotas precisam de autenticação
 router.use(authenticateToken);
 
+// Tipo flexível para aulas
+interface AulaBase {
+  id: number;
+  aluno: {
+    id: number;
+    nome: string;
+    email: string;
+  };
+  professor: {
+    id: number;
+    nome: string;
+    especialidade: string;
+  };
+  data: string;
+  horario: string;
+  duracao: number;
+  materia: string;
+  topico: string;
+  status: string;
+  tipo: string;
+  valor: number;
+  [key: string]: any; // Permite propriedades dinâmicas
+}
+
+// Sistema simples de "banco de dados" em memória para aulas
+let aulasMemoria: AulaBase[] = [
+  {
+    id: 1,
+    aluno: {
+      id: 1,
+      nome: 'João Silva',
+      email: 'joao@email.com'
+    },
+    professor: {
+      id: 1,
+      nome: 'Professor Exemplo',
+      especialidade: 'Matemática'
+    },
+    data: '2024-06-04',
+    horario: '14:00',
+    duracao: 60,
+    materia: 'Matemática',
+    topico: 'Equações do 2º grau',
+    status: 'agendada',
+    tipo: 'presencial',
+    valor: 100.00
+  },
+  {
+    id: 2,
+    aluno: {
+      id: 2,
+      nome: 'Maria Santos',
+      email: 'maria@email.com'
+    },
+    professor: {
+      id: 1,
+      nome: 'Professor Exemplo',
+      especialidade: 'Física'
+    },
+    data: '2024-06-04',
+    horario: '16:00',
+    duracao: 60,
+    materia: 'Física',
+    topico: 'Leis de Newton',
+    status: 'agendada',
+    tipo: 'online',
+    valor: 100.00
+  },
+  {
+    id: 3,
+    aluno: {
+      id: 3,
+      nome: 'Carlos Oliveira',
+      email: 'carlos@email.com'
+    },
+    professor: {
+      id: 1,
+      nome: 'Professor Exemplo',
+      especialidade: 'Química'
+    },
+    data: '2024-06-04',
+    horario: '18:00',
+    duracao: 60,
+    materia: 'Química',
+    topico: 'Reações Químicas',
+    status: 'agendada',
+    tipo: 'presencial',
+    valor: 100.00
+  }
+];
+
 // Listar aulas (professor e aluno)
 router.get('/', (req, res) => {
+  console.log('=== LISTAR TODAS AS AULAS ===');
+  console.log('Total de aulas:', aulasMemoria.length);
+  
   res.json({ 
     message: 'Lista de aulas',
-    data: [
-      {
-        id: 1,
-        aluno: {
-          id: 1,
-          nome: 'João Silva',
-          email: 'joao@email.com'
-        },
-        professor: {
-          id: 1,
-          nome: 'Professor Exemplo',
-          especialidade: 'Matemática'
-        },
-        data: '2024-01-20',
-        horario: '14:00',
-        duracao: 60,
-        materia: 'Matemática',
-        topico: 'Equações do 2º grau',
-        status: 'agendada',
-        tipo: 'presencial',
-        valor: 100.00
-      },
-      {
-        id: 2,
-        aluno: {
-          id: 2,
-          nome: 'Maria Santos',
-          email: 'maria@email.com'
-        },
-        professor: {
-          id: 1,
-          nome: 'Professor Exemplo',
-          especialidade: 'Física'
-        },
-        data: '2024-01-20',
-        horario: '16:00',
-        duracao: 60,
-        materia: 'Física',
-        topico: 'Leis de Newton',
-        status: 'agendada',
-        tipo: 'online',
-        valor: 100.00
-      }
-    ]
+    data: aulasMemoria
   });
 });
 
 // Detalhes de uma aula específica
 router.get('/:id', (req, res) => {
   const { id } = req.params;
-  res.json({
+  console.log('=== DETALHES DA AULA ===');
+  console.log('Aula ID:', id);
+  
+  const aula = aulasMemoria.find(a => a.id === parseInt(id));
+  
+  if (!aula) {
+    return res.status(404).json({
+      message: 'Aula não encontrada',
+      data: null
+    });
+  }
+  
+  return res.json({
     message: 'Detalhes da aula',
     data: {
-      id: parseInt(id),
-      aluno: {
-        id: 1,
-        nome: 'João Silva',
-        email: 'joao@email.com',
-        telefone: '(11) 88888-8888'
-      },
-      professor: {
-        id: 1,
-        nome: 'Professor Exemplo',
-        especialidade: 'Matemática'
-      },
-      data: '2024-01-20',
-      horario: '14:00',
-      duracao: 60,
-      materia: 'Matemática',
-      topico: 'Equações do 2º grau',
-      status: 'agendada',
-      tipo: 'presencial',
-      valor: 100.00,
+      ...aula,
       observacoes: 'Revisar exercícios da aula anterior',
       material: ['Livro capítulo 5', 'Lista de exercícios']
     }
-  });
-});
-
-// Agendar aula (apenas professor)
-router.post('/', (req, res) => {
-  res.json({ 
-    message: 'Aula agendada',
-    data: {
-      id: 3,
-      ...req.body,
-      status: 'agendada',
-      dataCriacao: new Date().toISOString()
-    }
-  });
-});
-
-// Reagendar aula
-router.put('/:id/reagendar', (req, res) => {
-  const { id } = req.params;
-  res.json({ 
-    message: 'Aula reagendada',
-    data: {
-      id: parseInt(id),
-      ...req.body,
-      status: 'reagendada',
-      dataAlteracao: new Date().toISOString()
-    }
-  });
-});
-
-// Cancelar aula
-router.delete('/:id', (req, res) => {
-  const { id } = req.params;
-  res.json({ 
-    message: 'Aula cancelada',
-    data: {
-      id: parseInt(id),
-      status: 'cancelada',
-      dataCancelamento: new Date().toISOString(),
-      motivo: req.body.motivo || 'Não informado'
-    }
-  });
-});
-
-// Marcar presença
-router.post('/:id/presenca', (req, res) => {
-  const { id } = req.params;
-  res.json({ 
-    message: 'Presença marcada',
-    data: {
-      aulaId: parseInt(id),
-      presente: req.body.presente || true,
-      observacoes: req.body.observacoes || '',
-      horarioMarcacao: new Date().toISOString()
-    }
-  });
-});
-
-// Histórico de aulas
-router.get('/historico', (req, res) => {
-  res.json({
-    message: 'Histórico de aulas',
-    data: [
-      {
-        id: 10,
-        data: '2024-01-15',
-        aluno: 'João Silva',
-        materia: 'Matemática',
-        status: 'realizada',
-        presenca: true,
-        nota: 8.5
-      },
-      {
-        id: 11,
-        data: '2024-01-12',
-        aluno: 'Maria Santos',
-        materia: 'Física',
-        status: 'realizada',
-        presenca: true,
-        nota: 9.0
-      }
-    ]
   });
 });
 
@@ -178,70 +140,22 @@ router.get('/data/:data', (req, res) => {
   console.log('=== BUSCAR AULAS POR DATA ===');
   console.log('Data solicitada:', data);
   
-  // Simular aulas diferentes para datas diferentes
-  const aulasExemplo = {
-    '2024-06-04': [
-      {
-        id: 1,
-        horario: '14:00',
-        aluno: { nome: 'João Silva', id: 1 },
-        materia: 'Matemática',
-        tipo: 'presencial',
-        status: 'agendada'
-      },
-      {
-        id: 2,
-        horario: '16:00',
-        aluno: { nome: 'Maria Santos', id: 2 },
-        materia: 'Física',
-        tipo: 'online',
-        status: 'agendada'
-      },
-      {
-        id: 3,
-        horario: '18:00',
-        aluno: { nome: 'Carlos Oliveira', id: 3 },
-        materia: 'Química',
-        tipo: 'presencial',
-        status: 'agendada'
-      }
-    ],
-    '2024-06-05': [
-      {
-        id: 4,
-        horario: '15:00',
-        aluno: { nome: 'Ana Silva', id: 4 },
-        materia: 'Matemática',
-        tipo: 'online',
-        status: 'agendada'
-      }
-    ],
-    '2024-06-06': [
-      {
-        id: 5,
-        horario: '10:00',
-        aluno: { nome: 'Pedro Santos', id: 5 },
-        materia: 'Português',
-        tipo: 'presencial',
-        status: 'agendada'
-      },
-      {
-        id: 6,
-        horario: '14:00',
-        aluno: { nome: 'Lucia Costa', id: 6 },
-        materia: 'História',
-        tipo: 'online',
-        status: 'agendada'
-      }
-    ]
-  };
+  // Filtrar aulas pela data
+  const aulasDaData = aulasMemoria.filter(aula => aula.data === data);
   
-  const aulasData = (aulasExemplo as any)[data] || [];
+  console.log('Aulas encontradas para', data, ':', aulasDaData.length);
   
   res.json({
     message: `Aulas para ${data}`,
-    data: aulasData,
-    total: aulasData.length
+    data: aulasDaData.map(aula => ({
+      id: aula.id,
+      horario: aula.horario,
+      aluno: { nome: aula.aluno.nome, id: aula.aluno.id },
+      materia: aula.materia,
+      tipo: aula.tipo,
+      status: aula.status
+    })),
+    total: aulasDaData.length
   });
 });
 
@@ -255,27 +169,27 @@ router.get('/semana/:data', (req, res) => {
       {
         dia: 'Segunda',
         data: '2024-06-03',
-        aulas: 2
+        aulas: aulasMemoria.filter(a => a.data === '2024-06-03').length
       },
       {
         dia: 'Terça', 
         data: '2024-06-04',
-        aulas: 3
+        aulas: aulasMemoria.filter(a => a.data === '2024-06-04').length
       },
       {
         dia: 'Quarta',
         data: '2024-06-05', 
-        aulas: 1
+        aulas: aulasMemoria.filter(a => a.data === '2024-06-05').length
       },
       {
         dia: 'Quinta',
         data: '2024-06-06',
-        aulas: 2
+        aulas: aulasMemoria.filter(a => a.data === '2024-06-06').length
       },
       {
         dia: 'Sexta',
         data: '2024-06-07',
-        aulas: 0
+        aulas: aulasMemoria.filter(a => a.data === '2024-06-07').length
       }
     ]
   });
@@ -288,19 +202,166 @@ router.post('/nova', (req, res) => {
   
   const { aluno, data, horario, materia, tipo, observacoes } = req.body;
   
+  // Criar nova aula e adicionar ao "banco"
+  const novaAula = {
+    id: Math.floor(Math.random() * 1000) + 100,
+    aluno: {
+      id: aluno?.id || 1,
+      nome: aluno?.nome || aluno || 'Aluno Novo',
+      email: aluno?.email || 'aluno@email.com'
+    },
+    professor: {
+      id: 1,
+      nome: 'Professor Exemplo',
+      especialidade: materia || 'Geral'
+    },
+    data,
+    horario,
+    duracao: 60,
+    materia: materia || 'Geral',
+    topico: req.body.topico || 'Aula particular',
+    status: 'agendada',
+    tipo: tipo || 'presencial',
+    valor: req.body.valor || 100.00
+  };
+  
+  // Adicionar à lista em memória
+  aulasMemoria.push(novaAula);
+  
+  console.log('✅ Aula criada e adicionada! Total de aulas:', aulasMemoria.length);
+  
   res.json({
     message: 'Aula agendada com sucesso',
+    data: novaAula
+  });
+});
+
+// Agendar aula (rota original melhorada)
+router.post('/', (req, res) => {
+  console.log('=== AGENDAR AULA (ROTA ORIGINAL) ===');
+  console.log('Dados recebidos:', req.body);
+  
+  const { aluno, data, horario, materia, tipo, observacoes } = req.body;
+  
+  const novaAula = {
+    id: Math.floor(Math.random() * 1000) + 200,
+    aluno: typeof aluno === 'string' ? 
+      { id: 1, nome: aluno, email: 'aluno@email.com' } : 
+      aluno || { id: 1, nome: 'Aluno Novo', email: 'aluno@email.com' },
+    professor: {
+      id: 1,
+      nome: 'Professor Exemplo',
+      especialidade: materia || 'Geral'
+    },
+    data,
+    horario,
+    duracao: 60,
+    materia: materia || 'Geral',
+    topico: req.body.topico || 'Aula particular',
+    status: 'agendada',
+    tipo: tipo || 'presencial',
+    valor: req.body.valor || 100.00
+  };
+  
+  aulasMemoria.push(novaAula);
+  
+  console.log('✅ Aula agendada! Total:', aulasMemoria.length);
+  
+  res.json({ 
+    message: 'Aula agendada',
+    data: novaAula
+  });
+});
+
+// Reagendar aula
+router.put('/:id/reagendar', (req, res) => {
+  const { id } = req.params;
+  console.log('=== REAGENDAR AULA ===');
+  console.log('Aula ID:', id);
+  console.log('Novos dados:', req.body);
+  
+  const aulaIndex = aulasMemoria.findIndex(a => a.id === parseInt(id));
+  
+  if (aulaIndex === -1) {
+    return res.status(404).json({
+      message: 'Aula não encontrada',
+      data: null
+    });
+  }
+  
+  // Atualizar aula
+  aulasMemoria[aulaIndex] = {
+    ...aulasMemoria[aulaIndex],
+    ...req.body,
+    status: 'reagendada',
+    dataAlteracao: new Date().toISOString()
+  };
+  
+  return res.json({ 
+    message: 'Aula reagendada',
+    data: aulasMemoria[aulaIndex]
+  });
+});
+
+// Cancelar aula
+router.delete('/:id', (req, res) => {
+  const { id } = req.params;
+  console.log('=== CANCELAR AULA ===');
+  console.log('Aula ID:', id);
+  
+  const aulaIndex = aulasMemoria.findIndex(a => a.id === parseInt(id));
+  
+  if (aulaIndex === -1) {
+    return res.status(404).json({
+      message: 'Aula não encontrada',
+      data: null
+    });
+  }
+  
+  aulasMemoria[aulaIndex].status = 'cancelada';
+  aulasMemoria[aulaIndex].dataCancelamento = new Date().toISOString();
+  aulasMemoria[aulaIndex].motivo = req.body.motivo || 'Não informado';
+  
+  return res.json({ 
+    message: 'Aula cancelada',
+    data: aulasMemoria[aulaIndex]
+  });
+});
+
+// Marcar presença
+router.post('/:id/presenca', (req, res) => {
+  const { id } = req.params;
+  console.log('=== MARCAR PRESENÇA ===');
+  console.log('Aula ID:', id);
+  
+  res.json({ 
+    message: 'Presença marcada',
     data: {
-      id: Math.floor(Math.random() * 1000) + 100,
-      aluno,
-      data,
-      horario,
-      materia,
-      tipo: tipo || 'presencial',
-      observacoes: observacoes || '',
-      status: 'agendada',
-      dataCriacao: new Date().toISOString()
+      aulaId: parseInt(id),
+      presente: req.body.presente || true,
+      observacoes: req.body.observacoes || '',
+      horarioMarcacao: new Date().toISOString()
     }
+  });
+});
+
+// Histórico de aulas
+router.get('/historico', (req, res) => {
+  console.log('=== HISTÓRICO DE AULAS ===');
+  
+  const aulasRealizadas = aulasMemoria.filter(a => a.status === 'realizada');
+  
+  res.json({
+    message: 'Histórico de aulas',
+    data: aulasRealizadas.map(aula => ({
+      id: aula.id,
+      data: aula.data,
+      aluno: aula.aluno.nome,
+      materia: aula.materia,
+      status: aula.status,
+      presenca: true,
+      nota: Math.floor(Math.random() * 3) + 8 // Nota aleatória entre 8-10
+    }))
   });
 });
 

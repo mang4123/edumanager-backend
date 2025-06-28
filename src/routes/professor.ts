@@ -344,4 +344,221 @@ router.patch('/duvidas/:id/resolver', (req: AuthRequest, res) => {
   });
 });
 
+// === ROTAS PARA AÇÕES DOS ALUNOS ===
+// Contato com aluno
+router.post('/alunos/:id/contato', (req: AuthRequest, res) => {
+  const { id } = req.params;
+  const { mensagem, tipo } = req.body;
+  
+  console.log('=== CONTATO COM ALUNO ===');
+  console.log('Aluno ID:', id);
+  console.log('Dados:', { mensagem, tipo });
+  
+  res.json({
+    message: 'Contato enviado com sucesso',
+    data: {
+      alunoId: parseInt(id),
+      mensagem,
+      tipo: tipo || 'email',
+      dataEnvio: new Date().toISOString(),
+      status: 'enviado'
+    }
+  });
+});
+
+// Histórico do aluno
+router.get('/alunos/:id/historico', (req: AuthRequest, res) => {
+  const { id } = req.params;
+  
+  console.log('=== HISTÓRICO DO ALUNO ===');
+  console.log('Aluno ID:', id);
+  
+  res.json({
+    message: 'Histórico do aluno',
+    data: {
+      alunoId: parseInt(id),
+      aulas: [
+        {
+          id: 1,
+          data: '2024-01-15',
+          materia: 'Matemática',
+          status: 'realizada',
+          nota: 8.5,
+          presenca: true
+        },
+        {
+          id: 2,
+          data: '2024-01-12',
+          materia: 'Física',
+          status: 'realizada',
+          nota: 9.0,
+          presenca: true
+        }
+      ],
+      exercicios: [
+        {
+          id: 1,
+          titulo: 'Equações do 2º grau',
+          dataEnvio: '2024-01-10',
+          status: 'entregue',
+          nota: 8.0
+        }
+      ],
+      estatisticas: {
+        totalAulas: 2,
+        mediaNotas: 8.75,
+        percentualPresenca: 100
+      }
+    }
+  });
+});
+
+// === ROTAS PARA AÇÕES DOS EXERCÍCIOS ===
+// Criar exercício
+router.post('/exercicios/criar', (req: AuthRequest, res) => {
+  console.log('=== CRIAR EXERCÍCIO ===');
+  console.log('Dados recebidos:', req.body);
+  
+  const { titulo, descricao, materia, prazo, alunos } = req.body;
+  
+  res.json({
+    message: 'Exercício criado com sucesso',
+    data: {
+      id: Math.floor(Math.random() * 1000) + 100,
+      titulo,
+      descricao,
+      materia,
+      prazo,
+      alunos: alunos || [],
+      status: 'criado',
+      dataCriacao: new Date().toISOString()
+    }
+  });
+});
+
+// Enviar exercício
+router.post('/exercicios/:id/enviar', (req: AuthRequest, res) => {
+  const { id } = req.params;
+  const { alunosIds, prazo } = req.body;
+  
+  console.log('=== ENVIAR EXERCÍCIO ===');
+  console.log('Exercício ID:', id);
+  console.log('Dados:', { alunosIds, prazo });
+  
+  res.json({
+    message: 'Exercício enviado com sucesso',
+    data: {
+      exercicioId: parseInt(id),
+      alunosIds: alunosIds || [],
+      prazo,
+      dataEnvio: new Date().toISOString(),
+      status: 'enviado'
+    }
+  });
+});
+
+// Ver exercício específico
+router.get('/exercicios/:id/detalhes', (req: AuthRequest, res) => {
+  const { id } = req.params;
+  
+  console.log('=== VER EXERCÍCIO ===');
+  console.log('Exercício ID:', id);
+  
+  res.json({
+    message: 'Detalhes do exercício',
+    data: {
+      id: parseInt(id),
+      titulo: 'Equações do 2º grau',
+      descricao: 'Resolva as equações propostas e justifique sua resposta',
+      materia: 'Matemática',
+      prazo: '2024-01-25',
+      status: 'enviado',
+      alunos: [
+        {
+          id: 1,
+          nome: 'João Silva',
+          status: 'pendente',
+          dataEnvio: null
+        },
+        {
+          id: 2,
+          nome: 'Maria Santos',
+          status: 'entregue',
+          dataEnvio: '2024-01-20',
+          nota: 8.5
+        }
+      ],
+      questoes: [
+        {
+          numero: 1,
+          enunciado: 'Resolva: x² - 5x + 6 = 0',
+          tipo: 'calculo'
+        }
+      ]
+    }
+  });
+});
+
+// === ROTAS PARA AGENDA E AULAS ===
+// Listar todas as aulas (para agenda)
+router.get('/agenda/aulas', (req: AuthRequest, res) => {
+  console.log('=== BUSCAR AULAS PARA AGENDA ===');
+  
+  res.json({
+    message: 'Aulas da agenda',
+    data: [
+      {
+        id: 1,
+        data: '2024-06-04',
+        horario: '14:00',
+        aluno: 'João Silva',
+        materia: 'Matemática',
+        status: 'agendada',
+        tipo: 'presencial'
+      },
+      {
+        id: 2,
+        data: '2024-06-04',
+        horario: '16:00',
+        aluno: 'Maria Santos',
+        materia: 'Física',
+        status: 'agendada',
+        tipo: 'online'
+      },
+      {
+        id: 3,
+        data: '2024-06-05',
+        horario: '15:00',
+        aluno: 'Carlos Oliveira',
+        materia: 'Química',
+        status: 'agendada',
+        tipo: 'presencial'
+      }
+    ]
+  });
+});
+
+// Criar nova aula (para agenda)
+router.post('/agenda/nova-aula', (req: AuthRequest, res) => {
+  console.log('=== NOVA AULA (AGENDA) ===');
+  console.log('Dados recebidos:', req.body);
+  
+  const { aluno, data, horario, materia, tipo, observacoes } = req.body;
+  
+  res.json({
+    message: 'Nova aula criada com sucesso',
+    data: {
+      id: Math.floor(Math.random() * 1000) + 200,
+      aluno,
+      data,
+      horario,
+      materia,
+      tipo: tipo || 'presencial',
+      observacoes: observacoes || '',
+      status: 'agendada',
+      dataCriacao: new Date().toISOString()
+    }
+  });
+});
+
 export { router as professorRoutes }; 
