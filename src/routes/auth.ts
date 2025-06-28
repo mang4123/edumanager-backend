@@ -5,13 +5,13 @@ const router = Router();
 const authController = new AuthController();
 
 // Rotas de autenticação
-router.post('/register', authController.register);
-router.post('/register/professor', authController.registerProfessor);
-router.post('/register/aluno', authController.registerAluno);
-router.post('/login', authController.login);
-router.post('/logout', authController.logout);
-router.post('/forgot-password', authController.forgotPassword);
-router.post('/reset-password', authController.resetPassword);
-router.get('/profile', authController.getProfile);
+router.post('/register', (req, res, next) => authController.register(req, res, next));
+router.post('/register/professor', (req, res, next) => authController.registerProfessor(req, res, next));
+router.post('/register/aluno', (req, res, next) => authController.registerAluno(req, res, next));
+router.post('/login', (req, res, next) => authController.login(req, res, next));
+router.post('/logout', (req, res, next) => authController.logout(req, res, next));
+router.post('/forgot-password', (req, res, next) => authController.forgotPassword(req, res, next));
+router.post('/reset-password', (req, res, next) => authController.resetPassword(req, res, next));
+router.get('/profile', (req, res, next) => authController.getProfile(req, res, next));
 
 export { router as authRoutes }; 
