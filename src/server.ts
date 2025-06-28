@@ -19,13 +19,67 @@ const PORT = process.env.PORT || 3001;
 
 // Middlewares de segurança
 app.use(helmet());
+
+// Lista de origens permitidas (incluindo Lovable)
+const allowedOrigins = [
+  'https://preview--tutor-class-organize.lovable.app',
+  'https://tutor-class-organize.lovable.app',
+  'https://lovable.dev',
+  'https://lovable.app',
+  'https://preview.lovable.app',
+  'https://preview.lovable.dev',
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'http://localhost:4173',
+  /^https:\/\/.*\.lovable\.app$/,
+  /^https:\/\/.*\.lovable\.dev$/,
+  /^https:\/\/preview--.*\.lovable\.app$/
+];
+
 app.use(cors({
-  origin: true, // Permite qualquer origem (temporário para debug)
+  origin: function (origin, callback) {
+    console.log('🌐 CORS CHECK - Origin:', origin);
+    
+    // Permite requisições sem origin (mobile apps, etc)
+    if (!origin) {
+      console.log('✅ CORS: Sem origin - permitido');
+      return callback(null, true);
+    }
+    
+    // Verifica se origin está na lista permitida
+    const isAllowed = allowedOrigins.some(allowedOrigin => {
+      if (typeof allowedOrigin === 'string') {
+        return allowedOrigin === origin;
+      } else {
+        return allowedOrigin.test(origin);
+      }
+    });
+    
+    if (isAllowed) {
+      console.log('✅ CORS: Origin permitida -', origin);
+      callback(null, true);
+    } else {
+      console.log('❌ CORS: Origin negada -', origin);
+      console.log('Lista permitida:', allowedOrigins.filter(o => typeof o === 'string'));
+      callback(null, true); // Temporariamente permitir todas até debug completo
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
-  optionsSuccessStatus: 200
+  optionsSuccessStatus: 200,
+  preflightContinue: false
 }));
+
+// Middleware específico para OPTIONS (preflight CORS)
+app.options('*', (req, res) => {
+  console.log('🚀 PREFLIGHT OPTIONS para:', req.originalUrl);
+  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+  res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS,PATCH');
+  res.header('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Requested-With,Accept,Origin');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.sendStatus(200);
+});
 
 // Middlewares de parsing
 app.use(express.json({ limit: '10mb' }));
