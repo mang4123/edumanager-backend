@@ -81,6 +81,38 @@ app.options('*', (req, res) => {
   res.sendStatus(200);
 });
 
+// === MIDDLEWARE ULTRA-DEBUG ===
+// Captura QUALQUER tentativa de rota que não seja encontrada
+app.use((req, res, next) => {
+  // Registra TODAS as chamadas para análise completa
+  if (req.originalUrl.startsWith('/api/')) {
+    console.log('🔍 MONITORAMENTO DE ROTA API:');
+    console.log('📍 Método:', req.method, '| URL:', req.originalUrl);
+    
+    // Se for uma rota não conhecida, destacar
+    if (!req.originalUrl.includes('/health') &&
+        !req.originalUrl.includes('/auth') &&
+        !req.originalUrl.includes('/professor/') &&
+        !req.originalUrl.includes('/aluno/') &&
+        !req.originalUrl.includes('/financeiro') &&
+        req.originalUrl !== '/api/aula' &&
+        !req.originalUrl.includes('/exercicio/') &&
+        !req.originalUrl.includes('/agenda/') &&
+        !req.originalUrl.includes('/criar') &&
+        !req.originalUrl.includes('/enviar') &&
+        !req.originalUrl.includes('/ver/')) {
+      
+      console.log('🚨🚨🚨 ROTA API POTENCIALMENTE PERDIDA 🚨🚨🚨');
+      console.log('📍 URL Completa:', req.originalUrl);
+      console.log('📍 Body:', JSON.stringify(req.body, null, 2));
+      console.log('📍 Query:', JSON.stringify(req.query, null, 2));
+      console.log('🚨🚨🚨 FIM ROTA PERDIDA 🚨🚨🚨');
+    }
+  }
+  
+  next();
+});
+
 // Middlewares de parsing
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
@@ -396,6 +428,254 @@ app.post('/api/nova-aula', authenticateToken, (req, res) => {
       id: Math.floor(Math.random() * 1000) + 800,
       ...req.body,
       status: 'agendada'
+    }
+  });
+});
+
+// === ROTAS ESPECÍFICAS PARA AGENDA ===
+// Todas as variações possíveis que o frontend pode estar chamando
+
+// Buscar aulas do calendário por data
+app.get('/api/agenda/:data', authenticateToken, (req, res) => {
+  const { data } = req.params;
+  console.log('🎯 AGENDA POR DATA (ESPECÍFICA):', data);
+  
+  // Sistema de aulas dinâmicas por data
+  const aulasDinamicas: any = {
+    '2025-06-07': [
+      { id: 1, horario: '14:00', aluno: 'Ana Silva', materia: 'Matemática', tipo: 'presencial' },
+      { id: 2, horario: '16:00', aluno: 'Carlos Santos', materia: 'Física', tipo: 'online' },
+      { id: 3, horario: '18:00', aluno: 'Maria Oliveira', materia: 'Química', tipo: 'presencial' }
+    ],
+    '2025-06-08': [
+      { id: 4, horario: '15:00', aluno: 'João Pedro', materia: 'História', tipo: 'online' }
+    ],
+    '2025-06-09': [
+      { id: 5, horario: '10:00', aluno: 'Ana Beatriz', materia: 'Geografia', tipo: 'presencial' },
+      { id: 6, horario: '14:00', aluno: 'Pedro Silva', materia: 'Matemática', tipo: 'presencial' }
+    ],
+    '2025-07-01': [
+      { id: 271, horario: '13:30', aluno: 'Aluno Novo', materia: 'Teste', tipo: 'presencial' }
+    ],
+    '2025-07-02': [
+      { id: 272, horario: '12:00', aluno: 'Aluno Novo', materia: 'Testeeee', tipo: 'presencial' }
+    ],
+    '2025-07-03': [
+      { id: 788, horario: '13:00', aluno: 'Maria Santos', materia: 'Francês', tipo: 'presencial' }
+    ]
+  };
+  
+  const aulasData = aulasDinamicas[data] || [];
+  
+  res.json({
+    message: `Aulas para ${data}`,
+    data: aulasData,
+    total: aulasData.length
+  });
+});
+
+// Nova aula da agenda (versões)
+app.post('/api/agenda/nova', authenticateToken, (req, res) => {
+  console.log('🎯 NOVA AULA AGENDA (ROTA NOVA)');
+  console.log('Dados:', req.body);
+  
+  res.json({
+    message: 'Aula criada na agenda',
+    data: {
+      id: Math.floor(Math.random() * 1000) + 900,
+      ...req.body,
+      status: 'agendada',
+      fonte: 'agenda-nova'
+    }
+  });
+});
+
+app.post('/api/agenda/aula', authenticateToken, (req, res) => {
+  console.log('🎯 AULA AGENDA (ROTA AULA)');
+  console.log('Dados:', req.body);
+  
+  res.json({
+    message: 'Aula criada na agenda',
+    data: {
+      id: Math.floor(Math.random() * 1000) + 950,
+      ...req.body,
+      status: 'agendada',
+      fonte: 'agenda-aula'
+    }
+  });
+});
+
+app.post('/api/agenda/create', authenticateToken, (req, res) => {
+  console.log('🎯 CREATE AGENDA');
+  console.log('Dados:', req.body);
+  
+  res.json({
+    message: 'Aula criada',
+    data: {
+      id: Math.floor(Math.random() * 1000) + 1000,
+      ...req.body,
+      status: 'agendada',
+      fonte: 'agenda-create'
+    }
+  });
+});
+
+// Buscar aulas da agenda (versões)
+app.get('/api/agenda', authenticateToken, (req, res) => {
+  console.log('🎯 GET AGENDA GERAL');
+  console.log('Query:', req.query);
+  
+  res.json({
+    message: 'Aulas da agenda',
+    data: [
+      { id: 1, data: '2025-06-07', horario: '14:00', aluno: 'Ana Silva', materia: 'Matemática' },
+      { id: 788, data: '2025-07-03', horario: '13:00', aluno: 'Maria Santos', materia: 'Francês' }
+    ]
+  });
+});
+
+// === ROTAS ESPECÍFICAS PARA EXERCÍCIOS ===
+// Todas as ações que podem estar sendo chamadas
+
+// Criar exercício (múltiplas variações)
+app.post('/api/exercicio/create', authenticateToken, (req, res) => {
+  console.log('🎯 CREATE EXERCÍCIO (ROTA CREATE)');
+  console.log('Dados:', req.body);
+  
+  res.json({
+    message: 'Exercício criado',
+    data: {
+      id: Math.floor(Math.random() * 1000) + 2000,
+      ...req.body,
+      status: 'criado',
+      fonte: 'exercicio-create'
+    }
+  });
+});
+
+app.post('/api/exercicio/novo', authenticateToken, (req, res) => {
+  console.log('🎯 NOVO EXERCÍCIO');
+  console.log('Dados:', req.body);
+  
+  res.json({
+    message: 'Exercício criado',
+    data: {
+      id: Math.floor(Math.random() * 1000) + 2100,
+      ...req.body,
+      status: 'criado',
+      fonte: 'exercicio-novo'
+    }
+  });
+});
+
+// Enviar exercício (múltiplas variações)
+app.post('/api/exercicio/enviar', authenticateToken, (req, res) => {
+  console.log('🎯 ENVIAR EXERCÍCIO (SEM ID)');
+  console.log('Dados:', req.body);
+  
+  res.json({
+    message: 'Exercício enviado',
+    data: {
+      id: req.body.id || Math.floor(Math.random() * 1000) + 2200,
+      status: 'enviado',
+      fonte: 'exercicio-enviar'
+    }
+  });
+});
+
+app.post('/api/exercicio/submit', authenticateToken, (req, res) => {
+  console.log('🎯 SUBMIT EXERCÍCIO');
+  console.log('Dados:', req.body);
+  
+  res.json({
+    message: 'Exercício submetido',
+    data: {
+      id: Math.floor(Math.random() * 1000) + 2300,
+      ...req.body,
+      status: 'submetido',
+      fonte: 'exercicio-submit'
+    }
+  });
+});
+
+// Ver exercício (múltiplas variações)
+app.get('/api/exercicio/view/:id', authenticateToken, (req, res) => {
+  const { id } = req.params;
+  console.log('🎯 VIEW EXERCÍCIO:', id);
+  
+  res.json({
+    message: 'Visualizar exercício',
+    data: {
+      id: parseInt(id),
+      titulo: 'Exercício Visualizado',
+      descricao: 'Descrição do exercício',
+      alunos: [
+        { nome: 'João Silva', status: 'pendente' },
+        { nome: 'Maria Santos', status: 'entregue' }
+      ]
+    }
+  });
+});
+
+app.get('/api/exercicio/details/:id', authenticateToken, (req, res) => {
+  const { id } = req.params;
+  console.log('🎯 DETAILS EXERCÍCIO:', id);
+  
+  res.json({
+    message: 'Detalhes do exercício',
+    data: {
+      id: parseInt(id),
+      titulo: 'Exercício Detalhado',
+      descricao: 'Descrição detalhada',
+      materia: 'Matemática',
+      status: 'ativo'
+    }
+  });
+});
+
+// === ROTAS PARA AÇÕES DOS BOTÕES ===
+// Botões específicos que podem estar sendo clicados
+
+// Botão "Criar Exercício"
+app.post('/api/criar', authenticateToken, (req, res) => {
+  console.log('🎯 BOTÃO CRIAR');
+  console.log('Dados:', req.body);
+  
+  res.json({
+    message: 'Item criado',
+    data: {
+      id: Math.floor(Math.random() * 1000) + 3000,
+      ...req.body,
+      status: 'criado'
+    }
+  });
+});
+
+// Botão "Ver"
+app.get('/api/ver/:id', authenticateToken, (req, res) => {
+  const { id } = req.params;
+  console.log('🎯 BOTÃO VER:', id);
+  
+  res.json({
+    message: 'Visualizar item',
+    data: {
+      id: parseInt(id),
+      titulo: 'Item Visualizado',
+      detalhes: 'Detalhes do item'
+    }
+  });
+});
+
+// Botão "Enviar"
+app.post('/api/enviar', authenticateToken, (req, res) => {
+  console.log('🎯 BOTÃO ENVIAR');
+  console.log('Dados:', req.body);
+  
+  res.json({
+    message: 'Item enviado',
+    data: {
+      id: Math.floor(Math.random() * 1000) + 3100,
+      status: 'enviado'
     }
   });
 });
