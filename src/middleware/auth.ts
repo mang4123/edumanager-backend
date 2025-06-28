@@ -75,14 +75,25 @@ export const authenticateToken = async (
 
 export const requireRole = (roles: ('professor' | 'aluno')[]) => {
   return (req: AuthRequest, res: Response, next: NextFunction) => {
+    console.log('=== REQUIRE ROLE CHECK ===');
+    console.log('URL:', req.url);
+    console.log('Required roles:', roles);
+    console.log('User:', req.user);
+    
     if (!req.user) {
+      console.log('❌ REQUIRE ROLE: Usuário não autenticado');
       return next(createError('Usuário não autenticado', 401));
     }
 
     if (!roles.includes(req.user.tipo)) {
+      console.log('❌ REQUIRE ROLE: Acesso negado');
+      console.log('User tipo:', req.user.tipo);
+      console.log('Required roles:', roles);
       return next(createError('Acesso negado para este tipo de usuário', 403));
     }
 
+    console.log('✅ REQUIRE ROLE: Acesso autorizado');
+    console.log('=== FIM REQUIRE ROLE ===');
     next();
   };
 }; 

@@ -6,19 +6,33 @@ export interface AppError extends Error {
 }
 
 export const errorHandler = (
-  err: AppError,
+  error: AppError,
   req: Request,
   res: Response,
   next: NextFunction
 ) => {
-  const statusCode = err.statusCode || 500;
-  const message = err.message || 'Erro interno do servidor';
+  console.log('=== ERROR HANDLER ===');
+  console.log('URL:', req.url);
+  console.log('Method:', req.method);
+  console.log('Error message:', error.message);
+  console.log('Status code:', error.statusCode);
+  console.log('Headers:', req.headers.authorization ? 'Auth header present' : 'No auth header');
+  
+  // Log detalhado para erros de autenticação/autorização
+  if (error.statusCode === 401 || error.statusCode === 403) {
+    console.log('🚨 AUTH/AUTHZ ERROR - This might cause frontend logout');
+    console.log('Full error:', error);
+  }
+  console.log('=== FIM ERROR HANDLER ===');
+
+  const statusCode = error.statusCode || 500;
+  const message = error.message || 'Erro interno do servidor';
 
   // Log do erro para desenvolvimento
   if (process.env.NODE_ENV === 'development') {
     console.error('🚨 Erro:', {
       message,
-      stack: err.stack,
+      stack: error.stack,
       url: req.url,
       method: req.method,
       body: req.body,
@@ -30,7 +44,7 @@ export const errorHandler = (
   res.status(statusCode).json({
     error: true,
     message,
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+    ...(process.env.NODE_ENV === 'development' && { stack: error.stack })
   });
 };
 
