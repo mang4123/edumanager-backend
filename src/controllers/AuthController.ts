@@ -41,14 +41,15 @@ export class AuthController {
         throw createError('Email, senha e nome são obrigatórios', 400);
       }
 
-      // Criar usuário no Supabase Auth
+      // Criar usuário no Supabase Auth usando SERVICE_ROLE_KEY
       console.log('=== TENTANDO CRIAR USUÁRIO NO SUPABASE AUTH ===');
       console.log('Email:', email);
       console.log('Password length:', password?.length);
       
-      const { data: authData, error: authError } = await supabase.auth.signUp({
+      const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
         email,
         password,
+        email_confirm: true, // Confirmar email automaticamente
       });
 
       console.log('=== RESULTADO SUPABASE AUTH ===');
@@ -136,10 +137,14 @@ export class AuthController {
         }
       }
 
-      // Criar usuário no Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.signUp({
+      // Criar usuário no Supabase Auth usando SERVICE_ROLE_KEY
+      console.log('=== TENTANDO CRIAR ALUNO NO SUPABASE AUTH ===');
+      console.log('Email:', email);
+      
+      const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
         email,
         password,
+        email_confirm: true, // Confirmar email automaticamente
       });
 
       if (authError) {
