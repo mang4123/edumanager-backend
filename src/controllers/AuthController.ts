@@ -29,7 +29,10 @@ export class AuthController {
   // Registrar Professor
   async registerProfessor(req: Request, res: Response, next: NextFunction) {
     try {
-      const { email, password, nome, especialidade, telefone } = req.body;
+      const { email, password, nome, especialidade, areaAtuacao, telefone } = req.body;
+      
+      // Mapear areaAtuacao para especialidade se necessário
+      const especialidadeFinal = especialidade || areaAtuacao;
 
       if (!email || !password || !nome) {
         throw createError('Email, senha e nome são obrigatórios', 400);
@@ -57,7 +60,7 @@ export class AuthController {
           email,
           nome,
           tipo: 'professor',
-          especialidade,
+          especialidade: especialidadeFinal,
           telefone,
           created_at: new Date().toISOString(),
         });
