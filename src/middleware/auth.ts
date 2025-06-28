@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { supabase } from '../config/supabase';
+import { supabase, supabaseAdmin } from '../config/supabase';
 import { createError } from './errorHandler';
 
 export interface AuthRequest extends Request {
@@ -36,8 +36,8 @@ export const authenticateToken = async (
       throw createError('Token inválido ou expirado', 401);
     }
 
-    // Busca informações do usuário na tabela profiles
-    const { data: profile, error } = await supabase
+    // Busca informações do usuário na tabela profiles usando admin client
+    const { data: profile, error } = await supabaseAdmin
       .from('profiles')
       .select('*')
       .eq('id', decoded.userId)
