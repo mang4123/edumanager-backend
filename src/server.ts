@@ -33,12 +33,28 @@ app.use(express.urlencoded({ extended: true }));
 
 // Middleware de logging detalhado para debug
 app.use((req, res, next) => {
-  console.log('=== REQUEST LOG ===');
-  console.log(`${req.method} ${req.originalUrl}`);
-  console.log('Headers:', req.headers.authorization ? 'Auth present' : 'No auth');
-  console.log('Body:', Object.keys(req.body).length > 0 ? req.body : 'Empty');
-  console.log('Query:', Object.keys(req.query).length > 0 ? req.query : 'Empty');
-  console.log('=== END REQUEST LOG ===');
+  console.log('==========================================');
+  console.log('🔥 NOVA REQUISIÇÃO DETECTADA');
+  console.log('==========================================');
+  console.log(`📍 ${req.method} ${req.originalUrl}`);
+  console.log(`📱 User-Agent: ${req.headers['user-agent']?.substring(0, 50)}...`);
+  console.log(`🔐 Auth Header: ${req.headers.authorization ? '✅ PRESENTE' : '❌ AUSENTE'}`);
+  console.log(`📦 Body Keys: ${Object.keys(req.body).length > 0 ? Object.keys(req.body).join(', ') : 'VAZIO'}`);
+  console.log(`🔍 Query Params: ${Object.keys(req.query).length > 0 ? JSON.stringify(req.query) : 'VAZIO'}`);
+  console.log(`⏰ Timestamp: ${new Date().toISOString()}`);
+  console.log('==========================================');
+  
+  // Interceptar resposta para log
+  const originalSend = res.send;
+  res.send = function(data) {
+    console.log('📤 RESPOSTA ENVIADA:');
+    console.log(`📍 ${req.method} ${req.originalUrl}`);
+    console.log(`📊 Status: ${res.statusCode}`);
+    console.log(`📝 Response: ${typeof data === 'string' ? data.substring(0, 200) : JSON.stringify(data).substring(0, 200)}...`);
+    console.log('==========================================');
+    return originalSend.call(this, data);
+  };
+  
   next();
 });
 
