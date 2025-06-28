@@ -17,6 +17,11 @@ router.get('/alunos', (req, res) => {
   res.json({ message: 'Lista de alunos' });
 });
 
+// Rota para compatibilidade com frontend (students = alunos)
+router.get('/students', (req, res) => {
+  res.json({ message: 'Lista de alunos', data: [] });
+});
+
 router.post('/alunos/convite', (req, res) => {
   res.json({ message: 'Convite enviado para aluno' });
 });

@@ -20,12 +20,17 @@ export const authenticateToken = async (
     const authHeader = req.headers.authorization;
     const token = authHeader && authHeader.split(' ')[1];
 
+    console.log('=== AUTH MIDDLEWARE ===');
+    console.log('URL:', req.url);
+    console.log('Token header:', authHeader ? 'Present' : 'Missing');
+
     if (!token) {
       throw createError('Token de acesso requerido', 401);
     }
 
     // Verifica o JWT próprio (não usa mais Supabase Auth)
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret') as any;
+    console.log('Token decoded:', { userId: decoded.userId, email: decoded.email, tipo: decoded.tipo });
 
     if (!decoded || !decoded.userId || !decoded.email) {
       throw createError('Token inválido ou expirado', 401);
@@ -38,7 +43,14 @@ export const authenticateToken = async (
       .eq('id', decoded.userId)
       .single();
 
+    console.log('Profile query result:', { 
+      profile: profile ? 'Found' : 'Not found', 
+      error: error ? error.message : null,
+      userId: decoded.userId 
+    });
+
     if (error || !profile) {
+      console.log('Profile error details:', error);
       throw createError('Usuário não encontrado', 401);
     }
 
@@ -48,8 +60,11 @@ export const authenticateToken = async (
       tipo: profile.tipo
     };
 
+    console.log('Auth successful for user:', profile.email);
+    console.log('=== FIM AUTH MIDDLEWARE ===');
     next();
   } catch (error: any) {
+    console.log('Auth error:', error.message);
     if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
       next(createError('Token inválido ou expirado', 401));
     } else {

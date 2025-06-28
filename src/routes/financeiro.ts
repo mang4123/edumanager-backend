@@ -7,6 +7,18 @@ const router = Router();
 router.use(authenticateToken);
 router.use(requireRole(['professor'])); // Apenas professores têm acesso
 
+// Rota principal para dados financeiros (compatibilidade com frontend)
+router.get('/', (req, res) => {
+  res.json({ 
+    message: 'Dados financeiros', 
+    data: {
+      totalRecebido: 0,
+      totalPendente: 0,
+      pagamentosRecentes: []
+    }
+  });
+});
+
 // Relatório financeiro
 router.get('/relatorio', (req, res) => {
   res.json({ message: 'Relatório financeiro' });
