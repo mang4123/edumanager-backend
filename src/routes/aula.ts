@@ -171,4 +171,137 @@ router.get('/historico', (req, res) => {
   });
 });
 
+// === ROTAS ESPECÍFICAS PARA CALENDÁRIO ===
+// Buscar aulas por data específica
+router.get('/data/:data', (req, res) => {
+  const { data } = req.params;
+  console.log('=== BUSCAR AULAS POR DATA ===');
+  console.log('Data solicitada:', data);
+  
+  // Simular aulas diferentes para datas diferentes
+  const aulasExemplo = {
+    '2024-06-04': [
+      {
+        id: 1,
+        horario: '14:00',
+        aluno: { nome: 'João Silva', id: 1 },
+        materia: 'Matemática',
+        tipo: 'presencial',
+        status: 'agendada'
+      },
+      {
+        id: 2,
+        horario: '16:00',
+        aluno: { nome: 'Maria Santos', id: 2 },
+        materia: 'Física',
+        tipo: 'online',
+        status: 'agendada'
+      },
+      {
+        id: 3,
+        horario: '18:00',
+        aluno: { nome: 'Carlos Oliveira', id: 3 },
+        materia: 'Química',
+        tipo: 'presencial',
+        status: 'agendada'
+      }
+    ],
+    '2024-06-05': [
+      {
+        id: 4,
+        horario: '15:00',
+        aluno: { nome: 'Ana Silva', id: 4 },
+        materia: 'Matemática',
+        tipo: 'online',
+        status: 'agendada'
+      }
+    ],
+    '2024-06-06': [
+      {
+        id: 5,
+        horario: '10:00',
+        aluno: { nome: 'Pedro Santos', id: 5 },
+        materia: 'Português',
+        tipo: 'presencial',
+        status: 'agendada'
+      },
+      {
+        id: 6,
+        horario: '14:00',
+        aluno: { nome: 'Lucia Costa', id: 6 },
+        materia: 'História',
+        tipo: 'online',
+        status: 'agendada'
+      }
+    ]
+  };
+  
+  const aulasData = (aulasExemplo as any)[data] || [];
+  
+  res.json({
+    message: `Aulas para ${data}`,
+    data: aulasData,
+    total: aulasData.length
+  });
+});
+
+// Buscar aulas de uma semana específica
+router.get('/semana/:data', (req, res) => {
+  const { data } = req.params;
+  
+  res.json({
+    message: `Aulas da semana de ${data}`,
+    data: [
+      {
+        dia: 'Segunda',
+        data: '2024-06-03',
+        aulas: 2
+      },
+      {
+        dia: 'Terça', 
+        data: '2024-06-04',
+        aulas: 3
+      },
+      {
+        dia: 'Quarta',
+        data: '2024-06-05', 
+        aulas: 1
+      },
+      {
+        dia: 'Quinta',
+        data: '2024-06-06',
+        aulas: 2
+      },
+      {
+        dia: 'Sexta',
+        data: '2024-06-07',
+        aulas: 0
+      }
+    ]
+  });
+});
+
+// Agendar nova aula (rota POST melhorada)
+router.post('/nova', (req, res) => {
+  console.log('=== NOVA AULA ===');
+  console.log('Dados recebidos:', req.body);
+  
+  const { aluno, data, horario, materia, tipo, observacoes } = req.body;
+  
+  res.json({
+    message: 'Aula agendada com sucesso',
+    data: {
+      id: Math.floor(Math.random() * 1000) + 100,
+      aluno,
+      data,
+      horario,
+      materia,
+      tipo: tipo || 'presencial',
+      observacoes: observacoes || '',
+      status: 'agendada',
+      dataCriacao: new Date().toISOString()
+    }
+  });
+});
+
 export { router as aulaRoutes }; 

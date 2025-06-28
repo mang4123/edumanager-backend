@@ -262,7 +262,7 @@ router.get('/notificacoes', (req, res) => {
 });
 
 // Estatísticas
-router.get('/stats', (req, res) => {
+router.get('/stats', (req: AuthRequest, res) => {
   res.json({
     message: 'Estatísticas',
     data: {
@@ -272,6 +272,74 @@ router.get('/stats', (req, res) => {
       taxaSucesso: 85,
       receitaTotal: 2500.00,
       crescimentoMensal: 15
+    }
+  });
+});
+
+// === ROTAS PARA DÚVIDAS ===
+// Listar dúvidas dos alunos
+router.get('/duvidas', (req: AuthRequest, res) => {
+  res.json({
+    message: 'Dúvidas dos alunos',
+    data: [
+      {
+        id: 1,
+        aluno: {
+          id: 1,
+          nome: 'Ana Silva',
+          foto: '/api/placeholder/32/32'
+        },
+        pergunta: 'Como resolver equações do segundo grau?',
+        materia: 'Matemática',
+        data: '2024-01-14',
+        status: 'pendente',
+        urgencia: 'normal'
+      },
+      {
+        id: 2,
+        aluno: {
+          id: 2,
+          nome: 'Carlos Santos',
+          foto: '/api/placeholder/32/32'
+        },
+        pergunta: 'Qual a diferença entre ser e estar?',
+        materia: 'Português',
+        data: '2024-01-13',
+        status: 'respondida',
+        resposta: 'Ser indica características permanentes, estar indica estados temporários.',
+        dataResposta: '2024-01-13',
+        urgencia: 'baixa'
+      }
+    ]
+  });
+});
+
+// Responder uma dúvida específica
+router.post('/duvidas/:id/responder', (req: AuthRequest, res) => {
+  const { id } = req.params;
+  const { resposta } = req.body;
+  
+  res.json({
+    message: 'Dúvida respondida com sucesso',
+    data: {
+      duvidaId: parseInt(id),
+      resposta,
+      dataResposta: new Date().toISOString(),
+      status: 'respondida'
+    }
+  });
+});
+
+// Marcar dúvida como resolvida
+router.patch('/duvidas/:id/resolver', (req: AuthRequest, res) => {
+  const { id } = req.params;
+  
+  res.json({
+    message: 'Dúvida marcada como resolvida',
+    data: {
+      duvidaId: parseInt(id),
+      status: 'resolvida',
+      dataResolucao: new Date().toISOString()
     }
   });
 });
