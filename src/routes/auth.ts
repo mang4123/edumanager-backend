@@ -5,6 +5,7 @@ const router = Router();
 const authController = new AuthController();
 
 // Rotas de autenticação
+router.post('/register', authController.register);
 router.post('/register/professor', authController.registerProfessor);
 router.post('/register/aluno', authController.registerAluno);
 router.post('/login', authController.login);

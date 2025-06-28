@@ -4,6 +4,28 @@ import { createError } from '../middleware/errorHandler';
 import { AuthRequest } from '../middleware/auth';
 
 export class AuthController {
+  // Registro genérico baseado no role
+  async register(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { role } = req.body;
+
+      if (!role) {
+        throw createError('Campo role é obrigatório (professor ou aluno)', 400);
+      }
+
+      switch (role) {
+        case 'professor':
+          return this.registerProfessor(req, res, next);
+        case 'aluno':
+          return this.registerAluno(req, res, next);
+        default:
+          throw createError('Role inválido. Use: professor ou aluno', 400);
+      }
+    } catch (error) {
+      next(error);
+    }
+  }
+
   // Registrar Professor
   async registerProfessor(req: Request, res: Response, next: NextFunction) {
     try {
@@ -65,20 +87,22 @@ export class AuthController {
     try {
       const { email, password, nome, telefone, professor_id } = req.body;
 
-      if (!email || !password || !nome || !professor_id) {
-        throw createError('Email, senha, nome e ID do professor são obrigatórios', 400);
+      if (!email || !password || !nome) {
+        throw createError('Email, senha e nome são obrigatórios', 400);
       }
 
-      // Verificar se o professor existe
-      const { data: professor } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('id', professor_id)
-        .eq('tipo', 'professor')
-        .single();
+      // Verificar se o professor existe (apenas se professor_id foi fornecido)
+      if (professor_id) {
+        const { data: professor } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('id', professor_id)
+          .eq('tipo', 'professor')
+          .single();
 
-      if (!professor) {
-        throw createError('Professor não encontrado', 404);
+        if (!professor) {
+          throw createError('Professor não encontrado', 404);
+        }
       }
 
       // Criar usuário no Supabase Auth
@@ -104,7 +128,7 @@ export class AuthController {
           nome,
           tipo: 'aluno',
           telefone,
-          professor_id,
+          professor_id, // Pode ser null
           created_at: new Date().toISOString(),
         });
 
