@@ -34,17 +34,32 @@ export class AuthController {
       // Mapear areaAtuacao para especialidade se necessário
       const especialidadeFinal = especialidade || areaAtuacao;
 
+      console.log('=== REGISTRO PROFESSOR ===');
+      console.log('Dados recebidos:', { email, nome, especialidadeFinal, telefone });
+
       if (!email || !password || !nome) {
         throw createError('Email, senha e nome são obrigatórios', 400);
       }
 
       // Criar usuário no Supabase Auth
+      console.log('=== TENTANDO CRIAR USUÁRIO NO SUPABASE AUTH ===');
+      console.log('Email:', email);
+      console.log('Password length:', password?.length);
+      
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
       });
 
+      console.log('=== RESULTADO SUPABASE AUTH ===');
+      console.log('Auth Data:', authData);
+      console.log('Auth Error:', authError);
+
       if (authError) {
+        console.error('=== ERRO DETALHADO SUPABASE AUTH ===');
+        console.error('Error message:', authError.message);
+        console.error('Error code:', authError.status);
+        console.error('Error details:', authError);
         throw createError(`Erro ao criar conta: ${authError.message}`, 400);
       }
 
@@ -53,19 +68,32 @@ export class AuthController {
       }
 
       // Criar perfil do professor
+      console.log('=== TENTANDO CRIAR PERFIL DO PROFESSOR ===');
+      const profileData = {
+        id: authData.user.id,
+        email,
+        nome,
+        tipo: 'professor',
+        especialidade: especialidadeFinal,
+        telefone,
+        created_at: new Date().toISOString(),
+      };
+      console.log('Profile data:', profileData);
+      
       const { error: profileError } = await supabaseAdmin
         .from('profiles')
-        .insert({
-          id: authData.user.id,
-          email,
-          nome,
-          tipo: 'professor',
-          especialidade: especialidadeFinal,
-          telefone,
-          created_at: new Date().toISOString(),
-        });
+        .insert(profileData);
+
+      console.log('=== RESULTADO CRIAÇÃO PERFIL ===');
+      console.log('Profile Error:', profileError);
 
       if (profileError) {
+        console.error('=== ERRO DETALHADO PERFIL ===');
+        console.error('Error message:', profileError.message);
+        console.error('Error code:', profileError.code);
+        console.error('Error details:', profileError.details);
+        console.error('Error hint:', profileError.hint);
+        
         // Se falhou criar o perfil, deletar o usuário do auth
         await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
         throw createError(`Erro ao criar perfil: ${profileError.message}`, 400);
