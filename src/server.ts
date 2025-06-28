@@ -171,12 +171,188 @@ app.get('/api/duvidas', authenticateToken, (req, res) => {
 });
 
 // === ROTAS ESPECÍFICAS PARA AÇÕES ===
-// Responder dúvida
+
+// === AGENDA - ROTAS ESPECÍFICAS ===
+// Nova aula da agenda
+app.post('/api/agenda/nova-aula', authenticateToken, (req, res) => {
+  console.log('🎯 NOVA AULA - AGENDA ESPECÍFICA');
+  console.log('Dados:', req.body);
+  
+  res.json({
+    message: 'Aula criada via agenda',
+    data: {
+      id: Math.floor(Math.random() * 1000) + 600,
+      ...req.body,
+      status: 'agendada',
+      fonte: 'agenda'
+    }
+  });
+});
+
+// Buscar aulas para agenda (diferentes formatos)
+app.get('/api/agenda/aulas', authenticateToken, (req, res) => {
+  console.log('🎯 BUSCAR AULAS AGENDA');
+  console.log('Query:', req.query);
+  
+  const { data } = req.query;
+  
+  res.json({
+    message: 'Aulas da agenda',
+    data: [
+      {
+        id: 1,
+        data: data || '2024-06-04',
+        horario: '14:00',
+        aluno: 'João Silva',
+        materia: 'Matemática'
+      },
+      {
+        id: 271, // A aula que foi criada
+        data: '2025-07-01',
+        horario: '13:30',
+        aluno: 'Aluno Novo',
+        materia: 'Teste'
+      }
+    ]
+  });
+});
+
+// Buscar aulas por data específica (para calendário)
+app.get('/api/agenda/data/:data', authenticateToken, (req, res) => {
+  const { data } = req.params;
+  console.log('🎯 AULAS POR DATA:', data);
+  
+  // Simular aulas diferentes para cada data
+  const aulasPorData: any = {
+    '2024-06-04': [
+      { id: 1, horario: '14:00', aluno: 'João Silva', materia: 'Matemática' },
+      { id: 2, horario: '16:00', aluno: 'Maria Santos', materia: 'Física' }
+    ],
+    '2024-06-05': [
+      { id: 3, horario: '15:00', aluno: 'Carlos', materia: 'Química' }
+    ],
+    '2025-07-01': [
+      { id: 271, horario: '13:30', aluno: 'Aluno Novo', materia: 'Teste' }
+    ]
+  };
+  
+  const aulasData = aulasPorData[data] || [];
+  
+  res.json({
+    message: `Aulas para ${data}`,
+    data: aulasData
+  });
+});
+
+// === ALUNOS - AÇÕES ESPECÍFICAS ===
+// Contato com aluno (versões alternativas)
+app.post('/api/contato/aluno/:id', authenticateToken, (req, res) => {
+  const { id } = req.params;
+  console.log('🎯 CONTATO ALUNO (ROTA ALTERNATIVA):', id);
+  console.log('Dados:', req.body);
+  
+  res.json({
+    message: 'Contato enviado',
+    data: { alunoId: id, status: 'enviado' }
+  });
+});
+
+app.get('/api/historico/aluno/:id', authenticateToken, (req, res) => {
+  const { id } = req.params;
+  console.log('🎯 HISTÓRICO ALUNO (ROTA ALTERNATIVA):', id);
+  
+  res.json({
+    message: 'Histórico do aluno',
+    data: {
+      alunoId: id,
+      aulas: [
+        { data: '2024-01-15', materia: 'Matemática', nota: 8.5 },
+        { data: '2024-01-12', materia: 'Física', nota: 9.0 }
+      ]
+    }
+  });
+});
+
+// === EXERCÍCIOS - AÇÕES ESPECÍFICAS ===
+// Criar exercício (versões alternativas)
+app.post('/api/criar-exercicio', authenticateToken, (req, res) => {
+  console.log('🎯 CRIAR EXERCÍCIO (ROTA ALTERNATIVA)');
+  console.log('Dados:', req.body);
+  
+  res.json({
+    message: 'Exercício criado',
+    data: {
+      id: Math.floor(Math.random() * 1000) + 700,
+      ...req.body,
+      status: 'criado'
+    }
+  });
+});
+
+app.post('/api/enviar-exercicio/:id', authenticateToken, (req, res) => {
+  const { id } = req.params;
+  console.log('🎯 ENVIAR EXERCÍCIO (ROTA ALTERNATIVA):', id);
+  console.log('Dados:', req.body);
+  
+  res.json({
+    message: 'Exercício enviado',
+    data: { exercicioId: id, status: 'enviado' }
+  });
+});
+
+app.get('/api/ver-exercicio/:id', authenticateToken, (req, res) => {
+  const { id } = req.params;
+  console.log('🎯 VER EXERCÍCIO (ROTA ALTERNATIVA):', id);
+  
+  res.json({
+    message: 'Detalhes do exercício',
+    data: {
+      id: parseInt(id),
+      titulo: 'Exercício de Matemática',
+      descricao: 'Resolver equações',
+      alunos: [
+        { nome: 'João Silva', status: 'pendente' },
+        { nome: 'Maria Santos', status: 'entregue' }
+      ]
+    }
+  });
+});
+
+// === DÚVIDAS - AÇÕES ESPECÍFICAS ===
+// Responder dúvida (versões alternativas)
+app.post('/api/responder-duvida/:id', authenticateToken, (req, res) => {
+  const { id } = req.params;
+  console.log('🎯 RESPONDER DÚVIDA (ROTA ALTERNATIVA):', id);
+  console.log('Resposta:', req.body);
+  
+  res.json({
+    message: 'Dúvida respondida',
+    data: { duvidaId: id, status: 'respondida' }
+  });
+});
+
+// === AGENDAR AULA - VERSÕES ALTERNATIVAS ===
+app.post('/api/nova-aula', authenticateToken, (req, res) => {
+  console.log('🎯 NOVA AULA (ROTA DIRETA)');
+  console.log('Dados:', req.body);
+  
+  res.json({
+    message: 'Aula criada',
+    data: {
+      id: Math.floor(Math.random() * 1000) + 800,
+      ...req.body,
+      status: 'agendada'
+    }
+  });
+});
+
+// === ROTAS ORIGINAIS RESTAURADAS ===
+// Responder dúvida (rota original)
 app.post('/api/duvidas/:id/responder', authenticateToken, (req, res) => {
   const { id } = req.params;
   const { resposta } = req.body;
   
-  console.log('=== RESPONDER DÚVIDA (ROTA DIRETA) ===');
+  console.log('🎯 RESPONDER DÚVIDA (ROTA ORIGINAL)');
   console.log('Dúvida ID:', id);
   console.log('Resposta:', resposta);
   
@@ -191,9 +367,9 @@ app.post('/api/duvidas/:id/responder', authenticateToken, (req, res) => {
   });
 });
 
-// Criar exercício (rota direta)
+// Criar exercício (rota original)
 app.post('/api/exercicios/criar', authenticateToken, (req, res) => {
-  console.log('=== CRIAR EXERCÍCIO (ROTA DIRETA) ===');
+  console.log('🎯 CRIAR EXERCÍCIO (ROTA ORIGINAL)');
   console.log('Dados recebidos:', req.body);
   
   const { titulo, descricao, materia, prazo, alunos } = req.body;
@@ -213,10 +389,10 @@ app.post('/api/exercicios/criar', authenticateToken, (req, res) => {
   });
 });
 
-// Enviar exercício (rota direta)
+// Enviar exercício (rota original)
 app.post('/api/exercicios/:id/enviar', authenticateToken, (req, res) => {
   const { id } = req.params;
-  console.log('=== ENVIAR EXERCÍCIO (ROTA DIRETA) ===');
+  console.log('🎯 ENVIAR EXERCÍCIO (ROTA ORIGINAL)');
   console.log('Exercício ID:', id);
   console.log('Dados:', req.body);
   
@@ -230,10 +406,10 @@ app.post('/api/exercicios/:id/enviar', authenticateToken, (req, res) => {
   });
 });
 
-// Ver exercício (rota direta)
+// Ver exercício (rota original)
 app.get('/api/exercicios/:id', authenticateToken, (req, res) => {
   const { id } = req.params;
-  console.log('=== VER EXERCÍCIO (ROTA DIRETA) ===');
+  console.log('🎯 VER EXERCÍCIO (ROTA ORIGINAL)');
   console.log('Exercício ID:', id);
   
   res.json({
@@ -252,25 +428,9 @@ app.get('/api/exercicios/:id', authenticateToken, (req, res) => {
   });
 });
 
-// Nova aula (rotas alternativas)
-app.post('/api/aulas/nova', authenticateToken, (req, res) => {
-  console.log('=== NOVA AULA (ROTA ALTERNATIVA) ===');
-  console.log('Dados recebidos:', req.body);
-  
-  res.json({
-    message: 'Aula criada com sucesso',
-    data: {
-      id: Math.floor(Math.random() * 1000) + 400,
-      ...req.body,
-      status: 'agendada',
-      dataCriacao: new Date().toISOString()
-    }
-  });
-});
-
-// Agendar aula (rota específica)
+// Agendar aula (rota original)
 app.post('/api/agendar-aula', authenticateToken, (req, res) => {
-  console.log('=== AGENDAR AULA (ROTA ESPECÍFICA) ===');
+  console.log('🎯 AGENDAR AULA (ROTA ORIGINAL)');
   console.log('Dados recebidos:', req.body);
   
   res.json({
@@ -284,10 +444,10 @@ app.post('/api/agendar-aula', authenticateToken, (req, res) => {
   });
 });
 
-// Contato com aluno (rota direta)
+// Contato com aluno (rota original)
 app.post('/api/alunos/:id/contato', authenticateToken, (req, res) => {
   const { id } = req.params;
-  console.log('=== CONTATO ALUNO (ROTA DIRETA) ===');
+  console.log('🎯 CONTATO ALUNO (ROTA ORIGINAL)');
   console.log('Aluno ID:', id);
   console.log('Dados:', req.body);
   
@@ -301,10 +461,10 @@ app.post('/api/alunos/:id/contato', authenticateToken, (req, res) => {
   });
 });
 
-// Histórico do aluno (rota direta)
+// Histórico do aluno (rota original)
 app.get('/api/alunos/:id/historico', authenticateToken, (req, res) => {
   const { id } = req.params;
-  console.log('=== HISTÓRICO ALUNO (ROTA DIRETA) ===');
+  console.log('🎯 HISTÓRICO ALUNO (ROTA ORIGINAL)');
   console.log('Aluno ID:', id);
   
   res.json({
@@ -323,16 +483,32 @@ app.get('/api/alunos/:id/historico', authenticateToken, (req, res) => {
   });
 });
 
+// === ROTAS ESPECÍFICAS DE DEBUG ===
+// Middleware para capturar TODAS as chamadas não encontradas
+app.use('*', (req, res, next) => {
+  console.log('🚨 ROTA NÃO ENCONTRADA 🚨');
+  console.log('Method:', req.method);
+  console.log('URL:', req.originalUrl);
+  console.log('Body:', req.body);
+  console.log('Headers:', req.headers);
+  console.log('========================');
+  
+  // Se for uma rota API que não existe, retornar erro específico
+  if (req.originalUrl.startsWith('/api/')) {
+    return res.status(404).json({
+      error: 'Rota não encontrada',
+      method: req.method,
+      url: req.originalUrl,
+      suggestion: 'Verifique se a rota está implementada corretamente'
+    });
+  }
+  
+  // Para rotas não-API, passar para o próximo middleware
+  return next();
+});
+
 // Middleware de tratamento de erros
 app.use(errorHandler);
-
-// Rota 404
-app.use('*', (req, res) => {
-  res.status(404).json({ 
-    error: 'Rota não encontrada',
-    path: req.originalUrl 
-  });
-});
 
 app.listen(PORT, () => {
   console.log(`🚀 EduManager API rodando na porta ${PORT}`);
