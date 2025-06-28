@@ -111,7 +111,8 @@ export class AuthController {
           especialidade: especialidadeFinal
         },
         access_token: token,
-        token: token // Adicionar token com nome alternativo para compatibilidade
+        token: token, // Adicionar token com nome alternativo para compatibilidade
+        auth_token: token // Adicionar auth_token para compatibilidade com Lovable
       });
     } catch (error) {
       next(error);
@@ -203,7 +204,8 @@ export class AuthController {
           role: 'aluno' // Adicionar campo role para compatibilidade com frontend
         },
         access_token: token,
-        token: token // Adicionar token com nome alternativo para compatibilidade
+        token: token, // Adicionar token com nome alternativo para compatibilidade
+        auth_token: token // Adicionar auth_token para compatibilidade com Lovable
       });
     } catch (error) {
       next(error);
@@ -263,7 +265,8 @@ export class AuthController {
           role: profile.tipo // Adicionar campo role para compatibilidade com frontend
         },
         access_token: token,
-        token: token // Adicionar token com nome alternativo para compatibilidade
+        token: token, // Adicionar token com nome alternativo para compatibilidade
+        auth_token: token // Adicionar auth_token para compatibilidade com Lovable
       });
     } catch (error) {
       next(error);
