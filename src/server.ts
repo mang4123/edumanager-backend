@@ -22,11 +22,18 @@ app.use(cors({
   origin: [
     process.env.FRONTEND_URL || 'http://localhost:3000',
     'https://lovable.dev',
-    'https://*.lovable.dev'
+    'https://app.lovable.dev',
+    'https://preview.lovable.dev',
+    /^https:\/\/.*\.lovable\.dev$/,
+    /^https:\/\/lovable\.dev$/,
+    'http://localhost:3000',
+    'http://localhost:5173',
+    'http://localhost:3001'
   ],
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
+  optionsSuccessStatus: 200
 }));
 
 // Middlewares de parsing
