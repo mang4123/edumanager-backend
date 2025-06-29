@@ -1,6 +1,6 @@
 {
   "name": "edumanager-backend",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Sistema de Gestão de Professores - Backend API",
   "main": "dist/server.js",
   "scripts": {

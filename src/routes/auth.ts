@@ -134,7 +134,7 @@ router.post('/register/aluno/convite', (req: any, res, next) => {
     convite.dataUso = new Date().toISOString();
     
     // Chamar controller de registro de aluno
-    authController.registerAluno(req, res, next);
+    return authController.registerAluno(req, res, next);
     
   } catch (error) {
     return res.status(500).json({
