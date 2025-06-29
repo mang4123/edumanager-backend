@@ -103,13 +103,13 @@ router.get('/profile', async (req: AuthRequest, res) => {
             });
         }
 
-        res.json({
+        return res.json({
             success: true,
             data: professor
         });
     } catch (error) {
         console.error('Erro ao buscar perfil:', error);
-        res.status(500).json({ 
+        return res.status(500).json({ 
             success: false, 
             error: 'Erro interno do servidor' 
         });
@@ -142,14 +142,14 @@ router.put('/profile', async (req: AuthRequest, res) => {
             });
         }
 
-        res.json({
+        return res.json({
             success: true,
             data,
             message: 'Perfil atualizado com sucesso'
         });
     } catch (error) {
         console.error('Erro ao atualizar perfil:', error);
-        res.status(500).json({ 
+        return res.status(500).json({ 
             success: false, 
             error: 'Erro interno do servidor' 
         });
@@ -182,13 +182,13 @@ router.get('/alunos', async (req: AuthRequest, res) => {
             });
         }
 
-        res.json({
+        return res.json({
             success: true,
             data: alunos || []
         });
     } catch (error) {
         console.error('Erro ao buscar alunos:', error);
-        res.status(500).json({ 
+        return res.status(500).json({ 
             success: false, 
             error: 'Erro interno do servidor' 
         });
@@ -221,13 +221,13 @@ router.get('/students', async (req: AuthRequest, res) => {
             });
         }
 
-        res.json({
+        return res.json({
             success: true,
             data: alunos || []
         });
     } catch (error) {
         console.error('Erro ao buscar alunos:', error);
-        res.status(500).json({ 
+        return res.status(500).json({ 
             success: false, 
             error: 'Erro interno do servidor' 
         });
@@ -276,7 +276,7 @@ router.get('/alunos/:id', async (req: AuthRequest, res) => {
             .eq('aluno_id', alunoId)
             .eq('professor_id', userId);
 
-        res.json({
+        return res.json({
             success: true,
             data: {
                 ...aluno,
@@ -293,7 +293,7 @@ router.get('/alunos/:id', async (req: AuthRequest, res) => {
         });
     } catch (error) {
         console.error('Erro ao buscar detalhes do aluno:', error);
-        res.status(500).json({ 
+        return res.status(500).json({ 
             success: false, 
             error: 'Erro interno do servidor' 
         });
@@ -324,14 +324,14 @@ router.post('/alunos/gerar-token', async (req: AuthRequest, res) => {
             });
         }
 
-        res.json({
+        return res.json({
             success: true,
             data: { token },
             message: `Token gerado: ${token}. Compartilhe com seu aluno.`
         });
     } catch (error) {
         console.error('Erro ao gerar token:', error);
-        res.status(500).json({ 
+        return res.status(500).json({ 
             success: false, 
             error: 'Erro interno do servidor' 
         });
@@ -358,13 +358,13 @@ router.delete('/alunos/:id', async (req: AuthRequest, res) => {
             });
         }
 
-        res.json({
+        return res.json({
             success: true,
             message: 'Aluno removido com sucesso'
         });
     } catch (error) {
         console.error('Erro ao remover aluno:', error);
-        res.status(500).json({ 
+        return res.status(500).json({ 
             success: false, 
             error: 'Erro interno do servidor' 
         });
@@ -372,82 +372,7 @@ router.delete('/alunos/:id', async (req: AuthRequest, res) => {
 });
 
 // === SISTEMA DE TOKEN SIMPLES PARA CONVITES ===
-// Gerar token simples para novo aluno
-router.post('/alunos/gerar-token', (req: any, res) => {
-  const { nome, email, telefone } = req.body;
-  const professorId = req.user?.id;
-  
-  console.log('=== GERAR TOKEN SIMPLES ===');
-  console.log('Nome:', nome);
-  console.log('Email:', email);
-  console.log('Telefone:', telefone);
-  console.log('Professor ID:', professorId);
-  
-  if (!nome || !email) {
-    return res.status(400).json({
-      success: false,
-      message: 'Nome e email são obrigatórios',
-      error: 'DADOS_INCOMPLETOS'
-    });
-  }
-  
-  try {
-    // Gerar token simples de 8 caracteres
-    const tokenSimples = Math.random().toString(36).substr(2, 8).toUpperCase();
-    
-    // Criar convite no estado global
-    const convite = {
-      id: tokenSimples,
-      token: tokenSimples,
-      professorId: professorId || 'professor-default',
-      nomeAluno: nome,
-      emailAluno: email,
-      telefoneAluno: telefone || '',
-      dataGeracao: new Date().toISOString(),
-      validoAte: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 dias
-      usado: false,
-      tipo: 'token_simples'
-    };
-    
-    req.estadoGlobal.convitesGerados.push(convite);
-    
-    console.log('✅ TOKEN GERADO COM SUCESSO:', tokenSimples);
-    
-    return res.status(201).json({
-      success: true,
-      message: 'Token gerado com sucesso!',
-      data: {
-        token: tokenSimples,
-        aluno: {
-          nome,
-          email,
-          telefone
-        },
-        validade: {
-          dias: 7,
-          dataLimite: convite.validoAte,
-          dataGeracao: convite.dataGeracao
-        },
-        instrucoes: {
-          paraAluno: `Use o token ${tokenSimples} ao se cadastrar no sistema`,
-          comoUsar: 'O aluno deve inserir este token no campo "Token de Convite" durante o cadastro'
-        },
-        estatisticas: {
-          totalTokens: req.estadoGlobal.convitesGerados.length,
-          tokensAtivos: req.estadoGlobal.convitesGerados.filter((c: any) => !c.usado && new Date(c.validoAte) > new Date()).length
-        }
-      }
-    });
-    
-  } catch (error) {
-    console.error('❌ ERRO ao gerar token:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Erro interno ao gerar token',
-      error: 'ERRO_INTERNO'
-    });
-  }
-});
+// (Removido rota duplicada - usando a implementação acima)
 
 // Validar token simples
 router.get('/tokens/:token/validar', (req: any, res) => {
