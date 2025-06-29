@@ -11,20 +11,6 @@ export const errorHandler = (
   res: Response,
   next: NextFunction
 ) => {
-  console.log('=== ERROR HANDLER ===');
-  console.log('URL:', req.url);
-  console.log('Method:', req.method);
-  console.log('Error message:', error.message);
-  console.log('Status code:', error.statusCode);
-  console.log('Headers:', req.headers.authorization ? 'Auth header present' : 'No auth header');
-  
-  // Log detalhado para erros de autenticação/autorização
-  if (error.statusCode === 401 || error.statusCode === 403) {
-    console.log('🚨 AUTH/AUTHZ ERROR - This might cause frontend logout');
-    console.log('Full error:', error);
-  }
-  console.log('=== FIM ERROR HANDLER ===');
-
   const statusCode = error.statusCode || 500;
   const message = error.message || 'Erro interno do servidor';
 

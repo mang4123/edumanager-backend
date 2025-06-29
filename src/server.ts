@@ -10,7 +10,7 @@ import studentRoutes from './routes/student';
 import { aulaRoutes } from './routes/aula';
 import { exercicioRoutes } from './routes/exercicio';
 import { financeiroRoutes } from './routes/financeiro';
-import { authenticateToken } from './middleware/auth';
+import { authenticateToken, requireRole } from './middleware/auth';
 
 // Carrega variáveis de ambiente
 dotenv.config();
@@ -18,131 +18,49 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Middlewares de segurança
-app.use(helmet());
-
-// Configuração CORS ULTRA PERMISSIVA (para produção)
+// CORS
 app.use(cors({
-  origin: true, // Permite QUALQUER origem
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH', 'HEAD'],
-  allowedHeaders: [
-    'Content-Type', 
-    'Authorization', 
-    'X-Requested-With', 
-    'Accept', 
-    'Origin',
-    'Cache-Control',
-    'X-File-Name'
-  ],
-  exposedHeaders: ['Content-Length', 'X-Request-ID'],
-  optionsSuccessStatus: 200,
-  preflightContinue: false,
-  maxAge: 86400 // Cache preflight por 24h
+  origin: true, // Permite qualquer origem temporariamente
+  credentials: true
 }));
 
-// Headers CORS manuais para garantir compatibilidade
-app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  console.log('🌐 CORS MANUAL - Origin:', origin);
-  
-  // Definir headers CORS manualmente
-  res.header('Access-Control-Allow-Origin', origin || '*');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS,PATCH,HEAD');
-  res.header('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Requested-With,Accept,Origin,Cache-Control,X-File-Name');
-  res.header('Access-Control-Expose-Headers', 'Content-Length,X-Request-ID');
-  
-  // Se for OPTIONS (preflight), responder imediatamente
-  if (req.method === 'OPTIONS') {
-    console.log('✅ PREFLIGHT OPTIONS respondido para:', req.originalUrl);
-    return res.sendStatus(200);
-  }
-  
-  console.log('✅ CORS: Headers definidos para', origin);
-  return next();
-});
-
-// === MIDDLEWARE ULTRA-DEBUG ===
-// Captura QUALQUER tentativa de rota que não seja encontrada
-app.use((req, res, next) => {
-  // Registra TODAS as chamadas para análise completa
-  if (req.originalUrl.startsWith('/api/')) {
-    console.log('🔍 MONITORAMENTO DE ROTA API:');
-    console.log('📍 Método:', req.method, '| URL:', req.originalUrl);
-    
-    // Se for uma rota não conhecida, destacar
-    if (!req.originalUrl.includes('/health') &&
-        !req.originalUrl.includes('/auth') &&
-        !req.originalUrl.includes('/professor/') &&
-        !req.originalUrl.includes('/aluno/') &&
-        !req.originalUrl.includes('/financeiro') &&
-        req.originalUrl !== '/api/aula' &&
-        !req.originalUrl.includes('/exercicio/') &&
-        !req.originalUrl.includes('/agenda/') &&
-        !req.originalUrl.includes('/criar') &&
-        !req.originalUrl.includes('/enviar') &&
-        !req.originalUrl.includes('/ver/')) {
-      
-      console.log('🚨🚨🚨 ROTA API POTENCIALMENTE PERDIDA 🚨🚨🚨');
-      console.log('📍 URL Completa:', req.originalUrl);
-      console.log('📍 Body:', JSON.stringify(req.body, null, 2));
-      console.log('📍 Query:', JSON.stringify(req.query, null, 2));
-      console.log('🚨🚨🚨 FIM ROTA PERDIDA 🚨🚨🚨');
-    }
-  }
-  
-  next();
-});
-
-// Middlewares de parsing
-app.use(express.json({ limit: '10mb' }));
+// Middleware básico
+app.use(helmet());
+app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Middleware de logging detalhado para debug
-app.use((req, res, next) => {
-  console.log('==========================================');
-  console.log('🔥 NOVA REQUISIÇÃO DETECTADA');
-  console.log('==========================================');
-  console.log(`📍 ${req.method} ${req.originalUrl}`);
-  console.log(`📱 User-Agent: ${req.headers['user-agent']?.substring(0, 50)}...`);
-  console.log(`🔐 Auth Header: ${req.headers.authorization ? '✅ PRESENTE' : '❌ AUSENTE'}`);
-  console.log(`📦 Body Keys: ${Object.keys(req.body).length > 0 ? Object.keys(req.body).join(', ') : 'VAZIO'}`);
-  console.log(`🔍 Query Params: ${Object.keys(req.query).length > 0 ? JSON.stringify(req.query) : 'VAZIO'}`);
-  console.log(`⏰ Timestamp: ${new Date().toISOString()}`);
-  console.log('==========================================');
-  
-  // Interceptar resposta para log
-  const originalSend = res.send;
-  res.send = function(data) {
-    console.log('📤 RESPOSTA ENVIADA:');
-    console.log(`📍 ${req.method} ${req.originalUrl}`);
-    console.log(`📊 Status: ${res.statusCode}`);
-    console.log(`📝 Response: ${typeof data === 'string' ? data.substring(0, 200) : JSON.stringify(data).substring(0, 200)}...`);
-    console.log('==========================================');
-    return originalSend.call(this, data);
-  };
+// === MIDDLEWARE DE ESTADO GLOBAL ===
+// Garante persistência de dados críticos
+app.use((req: any, res, next) => {
+  // Inicializar estado global se não existir
+  if (!req.estadoGlobal) {
+    req.estadoGlobal = {
+      convitesGerados: [],
+      dadosProfessores: {},
+      dadosAlunos: {},
+      lastSync: new Date().toISOString()
+    };
+  }
   
   next();
 });
 
-// Health check
+// Rota de saúde
 app.get('/health', (req, res) => {
   res.json({ 
     status: 'OK', 
-    message: 'EduManager Backend is running',
     timestamp: new Date().toISOString(),
-    version: '2.1.0' // CORS corrigido para Lovable
+    environment: process.env.NODE_ENV || 'development'
   });
 });
 
-// Rotas da API
+// Rotas principais
 app.use('/api/auth', authRoutes);
-app.use('/api/professor', professorRoutes);
-app.use('/api/aluno', alunoRoutes);
+app.use('/api/professor', authenticateToken, requireRole(['professor']), professorRoutes);
+app.use('/api/aluno', authenticateToken, requireRole(['aluno']), alunoRoutes);
 app.use('/api/student', studentRoutes);
 app.use('/api/aula', aulaRoutes);
-app.use('/api/exercicio', exercicioRoutes);
+app.use('/api/exercicio', authenticateToken, exercicioRoutes);
 app.use('/api/financeiro', financeiroRoutes);
 
 // === ROTAS ESPECÍFICAS PARA FUNCIONALIDADES ===
