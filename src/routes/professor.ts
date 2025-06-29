@@ -93,16 +93,34 @@ router.get('/students', (req, res) => {
 // Detalhes de um aluno específico
 router.get('/alunos/:id', (req, res) => {
   const { id } = req.params;
+  console.log('=== DETALHES DO ALUNO ===');
+  console.log('Aluno ID:', id);
+  
+  // Dados do aluno baseados no ID
+  const alunos: Record<string, { nome: string; email: string }> = {
+    '1': { nome: 'João Silva', email: 'joao@email.com' },
+    '2': { nome: 'Maria Santos', email: 'maria@email.com' }
+  };
+  
+  const aluno = alunos[id] || { nome: 'Aluno Desconhecido', email: 'aluno@email.com' };
+  
   res.json({
     message: 'Detalhes do aluno',
     data: {
       id: parseInt(id),
-      nome: 'João Silva',
-      email: 'joao@email.com',
+      nome: aluno.nome,
+      email: aluno.email,
       telefone: '(11) 88888-8888',
       status: 'ativo',
       aulas: 10,
       exercicios: 5,
+      proximaAula: {
+        id: 1,
+        data: '2025-07-02',
+        horario: '15:00',
+        materia: 'Matemática',
+        status: 'agendada'
+      },
       pagamentos: [
         { data: '2024-01-15', valor: 100, status: 'pago' }
       ]

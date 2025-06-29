@@ -144,16 +144,21 @@ router.get('/data/:data', (req, res) => {
   const aulasDaData = aulasMemoria.filter(aula => aula.data === data);
   
   console.log('Aulas encontradas para', data, ':', aulasDaData.length);
+  console.log('Dados das aulas:', aulasDaData);
   
   res.json({
     message: `Aulas para ${data}`,
     data: aulasDaData.map(aula => ({
       id: aula.id,
       horario: aula.horario,
-      aluno: { nome: aula.aluno.nome, id: aula.aluno.id },
+      aluno: { 
+        nome: aula.aluno?.nome || 'Aluno Desconhecido', 
+        id: aula.aluno?.id || 0 
+      },
       materia: aula.materia,
       tipo: aula.tipo,
-      status: aula.status
+      status: aula.status,
+      duracao: aula.duracao
     })),
     total: aulasDaData.length
   });
@@ -270,6 +275,36 @@ router.post('/', (req, res) => {
   res.json({ 
     message: 'Aula agendada',
     data: novaAula
+  });
+});
+
+// Editar aula
+router.put('/:id', (req, res) => {
+  const { id } = req.params;
+  console.log('=== EDITAR AULA ===');
+  console.log('Aula ID:', id);
+  console.log('Novos dados:', req.body);
+  
+  const aulaIndex = aulasMemoria.findIndex(a => a.id === parseInt(id));
+  
+  if (aulaIndex === -1) {
+    return res.status(404).json({
+      message: 'Aula não encontrada',
+      data: null
+    });
+  }
+  
+  // Atualizar aula
+  aulasMemoria[aulaIndex] = {
+    ...aulasMemoria[aulaIndex],
+    ...req.body,
+    status: 'atualizada',
+    dataAlteracao: new Date().toISOString()
+  };
+  
+  return res.json({ 
+    message: 'Aula atualizada com sucesso',
+    data: aulasMemoria[aulaIndex]
   });
 });
 
