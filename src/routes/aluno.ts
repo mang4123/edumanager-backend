@@ -194,43 +194,65 @@ router.get('/aulas', (req, res) => {
   });
 });
 
-// GET /api/aluno/materiais - Materiais disponíveis - CONECTADO AO SISTEMA GLOBAL
+// GET /api/aluno/materiais - Materiais disponíveis - CORRIGIDO
 router.get('/materiais', (req: any, res) => {
-  const alunoId = req.user?.id;
-  
-  console.log('=== MATERIAIS DO ALUNO (SISTEMA GLOBAL) ===');
-  console.log('Aluno ID:', alunoId);
-  console.log('Total exercícios enviados:', req.estadoGlobal?.exerciciosEnviados?.length || 0);
-  
-  // Filtrar exercícios enviados especificamente para este aluno
-  const exerciciosAluno = req.estadoGlobal?.exerciciosEnviados?.filter(
-    (exercicio: any) => exercicio.alunosIds.includes(1) || exercicio.alunosIds.includes(parseInt(alunoId?.slice(-1) || '1'))
-  ) || [];
-  
-  console.log('Exercícios encontrados para este aluno:', exerciciosAluno.length);
-  
-  // Converter exercícios para formato de materiais
-  const materiaisExercicios = exerciciosAluno.map((exercicio: any) => ({
-    id: exercicio.exercicioId,
-    titulo: exercicio.titulo,
-    descricao: exercicio.descricao,
-    tipo: 'exercicio',
-    materia: exercicio.materia,
-    professor: 'Professor Exemplo',
-    dataEnvio: exercicio.dataEnvio ? exercicio.dataEnvio.split('T')[0] : new Date().toISOString().split('T')[0],
-    prazo: exercicio.prazo,
-    status: 'pendente',
-    arquivo: `${exercicio.titulo.toLowerCase().replace(/\s+/g, '_')}.pdf`,
-    nota: null
-  }));
-  
-  // Combinar materiais enviados com os padrão
-  const todosMateriais = [...materiaisExercicios, ...materiaisAluno];
-  
-  return res.json({
-    message: "Materiais do aluno",
-    data: todosMateriais
-  });
+  try {
+    const alunoId = req.user?.id;
+    
+    console.log('=== MATERIAIS DO ALUNO (SISTEMA GLOBAL) ===');
+    console.log('Aluno ID:', alunoId);
+    console.log('Total exercícios enviados:', req.estadoGlobal?.exerciciosEnviados?.length || 0);
+    
+    // Filtrar exercícios enviados especificamente para este aluno - CORRIGIDO
+    const exerciciosAluno = req.estadoGlobal?.exerciciosEnviados?.filter(
+      (exercicio: any) => {
+        // Verificar se alunosIds existe e é um array
+        if (!exercicio || !Array.isArray(exercicio.alunosIds)) {
+          return false;
+        }
+        
+        // Verificar se o aluno está na lista
+        const alunoNumero = parseInt(alunoId?.slice(-1) || '1');
+        return exercicio.alunosIds.includes(1) || exercicio.alunosIds.includes(alunoNumero);
+      }
+    ) || [];
+    
+    console.log('Exercícios encontrados para este aluno:', exerciciosAluno.length);
+    
+    // Converter exercícios para formato de materiais - MELHORADO
+    const materiaisExercicios = exerciciosAluno.map((exercicio: any) => ({
+      id: exercicio.exercicioId || exercicio.id || Date.now(),
+      titulo: exercicio.titulo || 'Exercício sem título',
+      descricao: exercicio.descricao || 'Exercício enviado pelo professor',
+      tipo: 'exercicio',
+      materia: exercicio.materia || 'Geral',
+      professor: 'Professor Exemplo',
+      dataEnvio: exercicio.dataEnvio ? exercicio.dataEnvio.split('T')[0] : new Date().toISOString().split('T')[0],
+      prazo: exercicio.prazo || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      status: exercicio.status || 'pendente',
+      arquivo: `${(exercicio.titulo || 'exercicio').toLowerCase().replace(/\s+/g, '_')}.pdf`,
+      nota: null
+    }));
+    
+    // Combinar materiais enviados com os padrão
+    const todosMateriais = [...materiaisExercicios, ...materiaisAluno];
+    
+    console.log('✅ Total materiais retornados:', todosMateriais.length);
+    
+    return res.json({
+      message: "Materiais do aluno",
+      data: todosMateriais
+    });
+    
+  } catch (error) {
+    console.error('❌ ERRO ao buscar materiais:', error);
+    
+    // Retornar apenas materiais padrão em caso de erro
+    return res.json({
+      message: "Materiais do aluno (modo fallback)",
+      data: materiaisAluno
+    });
+  }
 });
 
 // GET /api/aluno/materiais/:id - Detalhes do material

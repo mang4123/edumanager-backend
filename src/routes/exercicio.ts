@@ -139,88 +139,113 @@ router.post('/', (req, res) => {
 
 // Enviar exercício para alunos específicos
 router.post('/:id/enviar', (req: any, res) => {
-  const { id } = req.params;
-  const { alunosIds, prazo } = req.body;
-  const professorId = req.user?.id || 'professor-default';
+  try {
+    const { id } = req.params;
+    const { alunosIds = [], prazo, titulo, descricao, materia } = req.body;
+    const professorId = req.user?.id || 'professor-default';
+    
+    console.log('=== ENVIAR EXERCÍCIO ===');
+    console.log('ID:', id);
+    console.log('Body:', req.body);
+    console.log('ProfessorId:', professorId);
+    
+    // Buscar exercício (aceita ID numérico ou string)
+    const exercicioId = isNaN(parseInt(id)) ? id : parseInt(id);
+    let exercicio = exerciciosMemoria.find(ex => ex.id === exercicioId);
+    
+    // Se não encontrou, criar exercício dinamicamente
+    if (!exercicio) {
+      exercicio = {
+        id: exercicioId,
+        titulo: titulo || `Exercício ${id}`,
+        descricao: descricao || `Exercício de demonstração criado automaticamente`,
+        materia: materia || 'Geral',
+        dificuldade: 'médio',
+        prazo: prazo || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        status: 'criado',
+        dataEnvio: new Date().toISOString().split('T')[0],
+        alunos: [],
+        pontuacao: 10,
+        tipo: 'exercício',
+        questoes: []
+      };
+      
+      // Adicionar à lista
+      exerciciosMemoria.push(exercicio);
+      console.log('✅ Exercício criado dinamicamente:', exercicio);
+    }
   
-  // Buscar exercício (aceita ID numérico ou string)
-  const exercicioId = isNaN(parseInt(id)) ? id : parseInt(id);
-  let exercicio = exerciciosMemoria.find(ex => ex.id === exercicioId);
-  
-  // Se não encontrou, criar exercício dinamicamente
-  if (!exercicio) {
-    exercicio = {
-      id: exercicioId,
-      titulo: `Exercício ${id}`,
-      descricao: `Exercício de demonstração criado automaticamente`,
-      materia: 'Geral',
-      dificuldade: 'médio',
-      prazo: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      status: 'criado',
-      dataEnvio: new Date().toISOString().split('T')[0],
-      alunos: [],
-      pontuacao: 10,
-      tipo: 'exercício',
-      questoes: []
+    // Criar registro do exercício enviado no estado global (se disponível)
+    const exercicioEnviado = {
+      id: Date.now(),
+      exercicioId: exercicioId,
+      professorId: professorId,
+      alunosIds: alunosIds,
+      titulo: exercicio.titulo,
+      descricao: exercicio.descricao,
+      materia: exercicio.materia,
+      prazo: prazo || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      dataEnvio: new Date().toISOString(),
+      status: 'enviado' as const
     };
     
-    // Adicionar à lista
-    exerciciosMemoria.push(exercicio);
-  }
-  
-  // Criar registro do exercício enviado no estado global
-  const exercicioEnviado = {
-    id: Date.now(),
-    exercicioId: parseInt(id),
-    professorId: professorId,
-    alunosIds: alunosIds,
-    titulo: exercicio.titulo,
-    descricao: exercicio.descricao,
-    materia: exercicio.materia,
-    prazo: prazo || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 7 dias a partir de hoje
-    dataEnvio: new Date().toISOString(),
-    status: 'enviado' as const
-  };
-  
-  req.estadoGlobal.exerciciosEnviados.push(exercicioEnviado);
-  
-  // Criar notificações para cada aluno
-  const alunosNomes = ['João Silva', 'Maria Santos', 'Carlos Oliveira'];
-  alunosIds.forEach((alunoId: number, index: number) => {
-    const alunoIdString = alunoId === 1 ? '725be6a4-addf-4e19-b866-496093537918' : `aluno-${alunoId}`;
-    
-    // Criar notificação para o aluno
-    req.estadoGlobal.criarNotificacao(
-      alunoIdString,
-      'exercicio',
-      `Novo exercício: ${exercicio.titulo}`,
-      `Você recebeu um novo exercício de ${exercicio.materia}. Prazo: ${prazo}`,
-      'normal',
-      {
-        tipo: 'redirect',
-        url: `/aluno/materiais/${id}`,
-        dados: { exercicioId: id, prazo }
-      }
-    );
-    
-    // Enviar notificação por email (simulado)
-    const emailAluno = `aluno${alunoId}@email.com`;
-    req.estadoGlobal.enviarNotificacaoEmail(
-      emailAluno,
-      `Novo Exercício: ${exercicio.titulo}`,
-      `Olá! Você recebeu um novo exercício de ${exercicio.materia}. Acesse sua área do aluno para visualizar. Prazo: ${prazo}`
-    );
-  });
-  
-  return res.json({
-    message: 'Exercício enviado com sucesso para todos os alunos',
-    data: {
-      exercicioEnviado,
-      alunosNotificados: alunosIds,
-      notificacaoEmail: true,
-      totalExerciciosEnviados: req.estadoGlobal.exerciciosEnviados.length
+    // Só adiciona ao estado global se existe
+    if (req.estadoGlobal?.exerciciosEnviados) {
+      req.estadoGlobal.exerciciosEnviados.push(exercicioEnviado);
+      console.log('✅ Exercício adicionado ao estado global');
     }
-  });
+    
+    // Criar notificações para cada aluno (se disponível)
+    if (alunosIds && alunosIds.length > 0) {
+      alunosIds.forEach((alunoId: number) => {
+        const alunoIdString = alunoId === 1 ? '725be6a4-addf-4e19-b866-496093537918' : `aluno-${alunoId}`;
+        
+        // Criar notificação para o aluno (se função disponível)
+        if (req.estadoGlobal?.criarNotificacao) {
+          req.estadoGlobal.criarNotificacao(
+            alunoIdString,
+            'exercicio',
+            `Novo exercício: ${exercicio.titulo}`,
+            `Você recebeu um novo exercício de ${exercicio.materia}. Prazo: ${prazo}`,
+            'normal',
+            {
+              tipo: 'redirect',
+              url: `/aluno/materiais/${id}`,
+              dados: { exercicioId: id, prazo }
+            }
+          );
+        }
+        
+        // Enviar notificação por email (se função disponível)  
+        if (req.estadoGlobal?.enviarNotificacaoEmail) {
+          const emailAluno = `aluno${alunoId}@email.com`;
+          req.estadoGlobal.enviarNotificacaoEmail(
+            emailAluno,
+            `Novo Exercício: ${exercicio.titulo}`,
+            `Olá! Você recebeu um novo exercício de ${exercicio.materia}. Acesse sua área do aluno para visualizar. Prazo: ${prazo}`
+          );
+        }
+      });
+      console.log('✅ Notificações criadas para', alunosIds.length, 'alunos');
+    }
+    
+    return res.json({
+      message: 'Exercício enviado com sucesso',
+      data: {
+        exercicioEnviado,
+        alunosNotificados: alunosIds.length,
+        notificacaoEmail: true,
+        totalExerciciosEnviados: req.estadoGlobal?.exerciciosEnviados?.length || 0
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ ERRO ao enviar exercício:', error);
+    return res.status(500).json({
+      message: 'Erro interno do servidor ao enviar exercício',
+      error: error instanceof Error ? error.message : 'Erro desconhecido'
+    });
+  }
 });
 
 // Responder exercício (apenas aluno)
