@@ -217,7 +217,7 @@ router.get('/materiais/:id', (req, res) => {
     });
   }
 
-  res.json({
+  return res.json({
     message: "Detalhes do material",
     data: material
   });
@@ -236,7 +236,7 @@ router.get('/materiais/:id/download', (req, res) => {
   }
 
   // Simular download
-  res.json({
+  return res.json({
     message: "Download iniciado",
     data: {
       materialId: materialId,
@@ -281,7 +281,7 @@ router.post('/duvidas', (req, res) => {
   
   console.log('✅ Nova dúvida criada:', novaDuvida);
 
-  res.status(201).json({
+  return res.status(201).json({
     message: "Dúvida enviada com sucesso",
     data: novaDuvida
   });
@@ -320,7 +320,7 @@ router.post('/pagamentos/pagar', (req, res) => {
 
   console.log('💳 Pagamento processado:', pagamento);
 
-  res.json({
+  return res.json({
     message: "Pagamento processado com sucesso",
     data: pagamento
   });
@@ -359,7 +359,7 @@ router.post('/exercicios/:id/entregar', (req, res) => {
   
   console.log('✅ Exercício entregue:', exercicio);
 
-  res.json({
+  return res.json({
     message: "Exercício entregue com sucesso",
     data: exercicio
   });
