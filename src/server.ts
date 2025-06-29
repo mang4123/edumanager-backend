@@ -147,10 +147,11 @@ app.use((req, res, next) => {
 
 // Health check
 app.get('/health', (req, res) => {
-  res.status(200).json({ 
+  res.json({ 
     status: 'OK', 
-    message: 'EduManager API está funcionando!',
-    timestamp: new Date().toISOString() 
+    message: 'EduManager Backend is running',
+    timestamp: new Date().toISOString(),
+    version: '2.0.1' // Atualizado para forçar redeploy
   });
 });
 
