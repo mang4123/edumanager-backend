@@ -1432,7 +1432,7 @@ router.put('/exercicios/:id', (req: AuthRequest, res) => {
   
   console.log('✅ Exercício atualizado:', exercicioAtualizado);
   
-  res.json({
+  return res.json({
     message: 'Exercício atualizado com sucesso',
     data: exercicioAtualizado
   });
@@ -1456,7 +1456,7 @@ router.delete('/exercicios/:id', (req: AuthRequest, res) => {
   
   console.log('✅ Exercício excluído:', exercicioExcluido);
   
-  res.json({
+  return res.json({
     message: 'Exercício excluído com sucesso',
     data: {
       exercicioExcluido: exercicioExcluido.titulo,

@@ -208,7 +208,7 @@ router.post('/', (req, res) => {
   
   console.log('✅ Exercício criado:', novoExercicio);
   
-  res.json({ 
+  return res.json({ 
     message: 'Exercício criado com sucesso',
     data: novoExercicio
   });
