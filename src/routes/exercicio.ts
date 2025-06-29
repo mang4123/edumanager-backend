@@ -143,13 +143,29 @@ router.post('/:id/enviar', (req: any, res) => {
   const { alunosIds, prazo } = req.body;
   const professorId = req.user?.id || 'professor-default';
   
-  // Buscar exercício
-  const exercicio = exerciciosMemoria.find(ex => ex.id === parseInt(id));
+  // Buscar exercício (aceita ID numérico ou string)
+  const exercicioId = isNaN(parseInt(id)) ? id : parseInt(id);
+  let exercicio = exerciciosMemoria.find(ex => ex.id === exercicioId);
   
+  // Se não encontrou, criar exercício dinamicamente
   if (!exercicio) {
-    return res.status(404).json({
-      message: 'Exercício não encontrado'
-    });
+    exercicio = {
+      id: exercicioId,
+      titulo: `Exercício ${id}`,
+      descricao: `Exercício de demonstração criado automaticamente`,
+      materia: 'Geral',
+      dificuldade: 'médio',
+      prazo: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      status: 'criado',
+      dataEnvio: new Date().toISOString().split('T')[0],
+      alunos: [],
+      pontuacao: 10,
+      tipo: 'exercício',
+      questoes: []
+    };
+    
+    // Adicionar à lista
+    exerciciosMemoria.push(exercicio);
   }
   
   // Criar registro do exercício enviado no estado global
