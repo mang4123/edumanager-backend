@@ -140,7 +140,7 @@ router.get('/data/:data', (req, res) => {
   console.log('=== BUSCAR AULAS POR DATA ===');
   console.log('Data solicitada:', data);
   
-  // Filtrar aulas pela data
+  // Filtrar aulas pela data (incluindo todas para visualização completa)
   const aulasDaData = aulasMemoria.filter(aula => aula.data === data);
   
   console.log('Aulas encontradas para', data, ':', aulasDaData.length);
@@ -158,7 +158,9 @@ router.get('/data/:data', (req, res) => {
       materia: aula.materia,
       tipo: aula.tipo,
       status: aula.status,
-      duracao: aula.duracao
+      duracao: aula.duracao,
+      motivo: aula.motivo || null,
+      dataCancelamento: aula.dataCancelamento || null
     })),
     total: aulasDaData.length
   });
@@ -205,15 +207,23 @@ router.post('/nova', (req, res) => {
   console.log('=== NOVA AULA ===');
   console.log('Dados recebidos:', req.body);
   
-  const { aluno, data, horario, materia, tipo, observacoes } = req.body;
+  const { aluno_id, data, horario, materia, tipo, observacoes } = req.body;
+  
+  // Buscar nome do aluno baseado no ID
+  const alunosDisponiveis: Record<number, { nome: string; email: string }> = {
+    1: { nome: 'João Silva', email: 'joao@email.com' },
+    2: { nome: 'Maria Santos', email: 'maria@email.com' }
+  };
+  
+  const alunoInfo = alunosDisponiveis[aluno_id] || { nome: 'Aluno Desconhecido', email: 'aluno@email.com' };
   
   // Criar nova aula e adicionar ao "banco"
   const novaAula = {
     id: Math.floor(Math.random() * 1000) + 100,
     aluno: {
-      id: aluno?.id || 1,
-      nome: aluno?.nome || aluno || 'Aluno Novo',
-      email: aluno?.email || 'aluno@email.com'
+      id: aluno_id || 1,
+      nome: alunoInfo.nome,
+      email: alunoInfo.email
     },
     professor: {
       id: 1,
@@ -234,6 +244,7 @@ router.post('/nova', (req, res) => {
   aulasMemoria.push(novaAula);
   
   console.log('✅ Aula criada e adicionada! Total de aulas:', aulasMemoria.length);
+  console.log('Aluno cadastrado:', alunoInfo.nome);
   
   res.json({
     message: 'Aula agendada com sucesso',
@@ -246,13 +257,23 @@ router.post('/', (req, res) => {
   console.log('=== AGENDAR AULA (ROTA ORIGINAL) ===');
   console.log('Dados recebidos:', req.body);
   
-  const { aluno, data, horario, materia, tipo, observacoes } = req.body;
+  const { aluno_id, data, horario, materia, tipo, observacoes } = req.body;
+  
+  // Buscar nome do aluno baseado no ID
+  const alunosDisponiveis: Record<number, { nome: string; email: string }> = {
+    1: { nome: 'João Silva', email: 'joao@email.com' },
+    2: { nome: 'Maria Santos', email: 'maria@email.com' }
+  };
+  
+  const alunoInfo = alunosDisponiveis[aluno_id] || { nome: 'Aluno Desconhecido', email: 'aluno@email.com' };
   
   const novaAula = {
     id: Math.floor(Math.random() * 1000) + 200,
-    aluno: typeof aluno === 'string' ? 
-      { id: 1, nome: aluno, email: 'aluno@email.com' } : 
-      aluno || { id: 1, nome: 'Aluno Novo', email: 'aluno@email.com' },
+    aluno: {
+      id: aluno_id || 1,
+      nome: alunoInfo.nome,
+      email: alunoInfo.email
+    },
     professor: {
       id: 1,
       nome: 'Professor Exemplo',
@@ -271,6 +292,7 @@ router.post('/', (req, res) => {
   aulasMemoria.push(novaAula);
   
   console.log('✅ Aula agendada! Total:', aulasMemoria.length);
+  console.log('Aluno cadastrado:', alunoInfo.nome);
   
   res.json({ 
     message: 'Aula agendada',
