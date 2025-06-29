@@ -128,8 +128,339 @@ router.get('/alunos/:id', (req, res) => {
   });
 });
 
-router.post('/alunos/convite', (req, res) => {
-  res.json({ message: 'Convite enviado para aluno' });
+// === SISTEMA DE CONVITE POR LINK EXCLUSIVO ===
+// Gerar link de convite para aluno
+router.post('/alunos/convite', (req: AuthRequest, res) => {
+  const { nomeAluno, emailAluno, telefoneAluno } = req.body;
+  
+  console.log('=== GERAR CONVITE EXCLUSIVO ===');
+  console.log('Professor ID:', req.user?.id);
+  console.log('Dados do aluno:', { nomeAluno, emailAluno, telefoneAluno });
+  
+  // Gerar token único para o convite
+  const conviteToken = Buffer.from(`${req.user?.id}-${emailAluno}-${Date.now()}`).toString('base64');
+  const linkConvite = `https://preview--tutor-class-organize.lovable.app/aluno/cadastro?convite=${conviteToken}&professor=${req.user?.id}`;
+  
+  res.json({
+    message: 'Link de convite gerado com sucesso',
+    data: {
+      conviteToken,
+      linkConvite,
+      nomeAluno,
+      emailAluno,
+      telefoneAluno,
+      professorId: req.user?.id,
+      validoAte: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 dias
+      dataGeracao: new Date().toISOString()
+    }
+  });
+});
+
+// Validar convite
+router.get('/convites/:token/validar', (req: AuthRequest, res) => {
+  const { token } = req.params;
+  
+  console.log('=== VALIDAR CONVITE ===');
+  console.log('Token:', token);
+  
+  try {
+    // Decodificar token (simplificado para demonstração)
+    const decoded = Buffer.from(token, 'base64').toString('utf-8');
+    const [professorId, email, timestamp] = decoded.split('-');
+    
+    // Verificar se o convite não expirou (7 dias)
+    const dataGeracao = new Date(parseInt(timestamp));
+    const agora = new Date();
+    const diffDias = (agora.getTime() - dataGeracao.getTime()) / (1000 * 60 * 60 * 24);
+    
+    if (diffDias > 7) {
+      return res.status(400).json({
+        message: 'Convite expirado',
+        data: { valido: false, motivo: 'Convite válido por apenas 7 dias' }
+      });
+    }
+    
+    res.json({
+      message: 'Convite válido',
+      data: {
+        valido: true,
+        professorId,
+        emailConvidado: email,
+        diasRestantes: Math.ceil(7 - diffDias)
+      }
+    });
+    
+  } catch (error) {
+    res.status(400).json({
+      message: 'Token de convite inválido',
+      data: { valido: false, motivo: 'Token malformado ou inválido' }
+    });
+  }
+});
+
+// === ÁREA DE GRAVAÇÃO PREMIUM (BLOQUEADA) ===
+// Acessar gravações (bloqueado)
+router.get('/gravacoes', (req: AuthRequest, res) => {
+  console.log('=== ÁREA DE GRAVAÇÃO (PREMIUM) ===');
+  
+  res.json({
+    message: 'Área Premium - Gravação de Aulas',
+    data: {
+      bloqueado: true,
+      planoAtual: 'Gratuito',
+      recursosPremium: [
+        'Gravação de aulas em HD',
+        'Armazenamento ilimitado',
+        'Compartilhamento com alunos',
+        'Controle de acesso por aula',
+        'Relatórios de visualização'
+      ],
+      linkUpgrade: 'https://edumanager.com/upgrade',
+      precoMensal: 29.90,
+      desconto: '30% OFF por tempo limitado'
+    }
+  });
+});
+
+// Tentar iniciar gravação (bloqueado)
+router.post('/gravacoes/iniciar', (req: AuthRequest, res) => {
+  console.log('=== TENTATIVA DE GRAVAÇÃO (BLOQUEADA) ===');
+  
+  res.status(402).json({
+    message: 'Recurso Premium - Upgrade necessário',
+    data: {
+      recurso: 'gravacao_aulas',
+      bloqueado: true,
+      motivo: 'Disponível apenas no plano Premium',
+      linkUpgrade: 'https://edumanager.com/upgrade',
+      beneficios: [
+        'Gravações em HD',
+        'Sem limite de tempo',
+        'Acesso dos alunos',
+        'Backup automático'
+      ]
+    }
+  });
+});
+
+// === COMENTÁRIOS PRIVADOS SOBRE AULAS ===
+// Adicionar comentário privado sobre aula
+router.post('/aulas/:aulaId/comentario', (req: AuthRequest, res) => {
+  const { aulaId } = req.params;
+  const { comentario, privado = true } = req.body;
+  
+  console.log('=== COMENTÁRIO PRIVADO AULA ===');
+  console.log('Aula ID:', aulaId);
+  console.log('Comentário:', comentario);
+  
+  res.json({
+    message: 'Comentário adicionado com sucesso',
+    data: {
+      id: Math.floor(Math.random() * 1000) + 500,
+      aulaId: parseInt(aulaId),
+      professorId: req.user?.id,
+      comentario,
+      privado,
+      dataComentario: new Date().toISOString(),
+      editavel: true
+    }
+  });
+});
+
+// Listar comentários de uma aula
+router.get('/aulas/:aulaId/comentarios', (req: AuthRequest, res) => {
+  const { aulaId } = req.params;
+  
+  console.log('=== LISTAR COMENTÁRIOS AULA ===');
+  console.log('Aula ID:', aulaId);
+  
+  res.json({
+    message: 'Comentários da aula',
+    data: [
+      {
+        id: 1,
+        comentario: 'Aluno teve dificuldade com equações. Revisar na próxima aula.',
+        privado: true,
+        dataComentario: '2024-01-15T16:30:00Z',
+        editavel: true
+      },
+      {
+        id: 2,
+        comentario: 'Excelente progresso em álgebra. Pode avançar para funções.',
+        privado: true,
+        dataComentario: '2024-01-12T14:45:00Z',
+        editavel: true
+      }
+    ]
+  });
+});
+
+// === ÁREAS DE ATUAÇÃO ESPECÍFICAS ===
+// Listar áreas de atuação disponíveis
+router.get('/areas-atuacao', (req: AuthRequest, res) => {
+  console.log('=== ÁREAS DE ATUAÇÃO DISPONÍVEIS ===');
+  
+  res.json({
+    message: 'Áreas de atuação disponíveis',
+    data: {
+      categorias: [
+        {
+          categoria: 'Reforço Escolar',
+          areas: [
+            'Matemática - Ensino Fundamental',
+            'Matemática - Ensino Médio',
+            'Português - Ensino Fundamental',
+            'Português - Ensino Médio',
+            'Ciências - Ensino Fundamental',
+            'Física - Ensino Médio',
+            'Química - Ensino Médio',
+            'Biologia - Ensino Médio',
+            'História',
+            'Geografia',
+            'Redação e Escrita'
+          ]
+        },
+        {
+          categoria: 'Idiomas',
+          areas: [
+            'Inglês',
+            'Espanhol',
+            'Francês',
+            'Alemão',
+            'Italiano',
+            'Japonês',
+            'Mandarim',
+            'Português para Estrangeiros'
+          ]
+        },
+        {
+          categoria: 'Música',
+          areas: [
+            'Piano',
+            'Violão',
+            'Guitarra',
+            'Bateria',
+            'Violino',
+            'Flauta',
+            'Saxofone',
+            'Canto e Vocal',
+            'Teoria Musical',
+            'Produção Musical'
+          ]
+        },
+        {
+          categoria: 'Atividade Física',
+          areas: [
+            'Personal Trainer',
+            'Yoga',
+            'Pilates',
+            'Funcional',
+            'Musculação',
+            'Crossfit',
+            'Dança',
+            'Artes Marciais',
+            'Natação',
+            'Corrida e Atletismo'
+          ]
+        },
+        {
+          categoria: 'Tecnologia',
+          areas: [
+            'Programação - Python',
+            'Programação - JavaScript',
+            'Programação - Java',
+            'Design Gráfico',
+            'Edição de Vídeo',
+            'Excel Avançado',
+            'PowerPoint',
+            'Photoshop',
+            'Ilustrator',
+            'Marketing Digital'
+          ]
+        },
+        {
+          categoria: 'Preparatórios',
+          areas: [
+            'ENEM',
+            'Vestibular',
+            'Concursos Públicos',
+            'OAB',
+            'Residência Médica',
+            'Pós-Graduação',
+            'MBA',
+            'Certificações TI'
+          ]
+        }
+      ],
+      permitirOutros: true,
+      campoPersonalizado: 'Outra área de atuação'
+    }
+  });
+});
+
+// === SISTEMA DE NOTIFICAÇÕES DE AULA ===
+// Configurar notificações
+router.post('/notificacoes/configurar', (req: AuthRequest, res) => {
+  const { 
+    lembreteAula24h, 
+    lembreteAula1h, 
+    notificarPagamento,
+    notificarNovasDuvidas,
+    email,
+    sms 
+  } = req.body;
+  
+  console.log('=== CONFIGURAR NOTIFICAÇÕES ===');
+  console.log('Configurações:', req.body);
+  
+  res.json({
+    message: 'Notificações configuradas com sucesso',
+    data: {
+      professorId: req.user?.id,
+      configuracoes: {
+        lembreteAula24h: lembreteAula24h || true,
+        lembreteAula1h: lembreteAula1h || true,
+        notificarPagamento: notificarPagamento || true,
+        notificarNovasDuvidas: notificarNovasDuvidas || true,
+        canaisAtivos: {
+          email: email || true,
+          sms: sms || false
+        }
+      },
+      dataAtualizacao: new Date().toISOString()
+    }
+  });
+});
+
+// === LINKS DE PAGAMENTO PIX/CARTÃO ===
+// Gerar link de pagamento
+router.post('/pagamentos/gerar-link', (req: AuthRequest, res) => {
+  const { alunoId, valor, descricao, vencimento, metodosPermitidos } = req.body;
+  
+  console.log('=== GERAR LINK PAGAMENTO ===');
+  console.log('Dados:', { alunoId, valor, descricao, metodosPermitidos });
+  
+  const linkId = Math.random().toString(36).substr(2, 9);
+  
+  res.json({
+    message: 'Link de pagamento gerado com sucesso',
+    data: {
+      linkId,
+      url: `https://edumanager.com/pagar/${linkId}`,
+      qrCodePix: `https://edumanager.com/qr/${linkId}`,
+      dadosPix: {
+        chave: 'professor@email.com',
+        nomeRecebedor: (req.user as any)?.nome || 'Professor',
+        valor: parseFloat(valor),
+        descricao: descricao || 'Pagamento de aulas'
+      },
+      metodosDisponiveis: metodosPermitidos || ['pix', 'cartao', 'boleto'],
+      valor: parseFloat(valor),
+      vencimento: vencimento || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      status: 'ativo',
+      dataGeracao: new Date().toISOString()
+    }
+  });
 });
 
 // Aulas

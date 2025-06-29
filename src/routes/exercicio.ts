@@ -239,4 +239,176 @@ router.get('/questoes', (req, res) => {
   });
 });
 
+// === SISTEMA DE UPLOAD DE MATERIAIS PARA PROFESSORES ===
+// Upload de material por professor
+router.post('/:id/upload-material', (req, res) => {
+  const { id } = req.params;
+  const { arquivos, links, tipoMaterial = 'complementar', descricao } = req.body;
+  
+  console.log('=== UPLOAD MATERIAL (PROFESSOR) ===');
+  console.log('Exercício ID:', id);
+  console.log('Tipo:', tipoMaterial);
+  console.log('Arquivos:', arquivos?.length || 0);
+  console.log('Links:', links?.length || 0);
+  
+  const uploadId = Math.random().toString(36).substr(2, 9);
+  
+  res.json({
+    message: 'Material enviado com sucesso',
+    data: {
+      uploadId,
+      exercicioId: parseInt(id),
+      materiaisEnviados: {
+        arquivos: arquivos || [
+          {
+            nome: 'lista_exercicios.pdf',
+            tamanho: '1.8MB',
+            tipo: 'application/pdf',
+            url: `/uploads/professor/${uploadId}/lista_exercicios.pdf`
+          },
+          {
+            nome: 'exemplo_resolvido.jpg',
+            tamanho: '650KB',
+            tipo: 'image/jpeg',
+            url: `/uploads/professor/${uploadId}/exemplo_resolvido.jpg`
+          }
+        ],
+        links: links || [
+          {
+            titulo: 'Vídeo explicativo - Khan Academy',
+            url: 'https://www.khanacademy.org/math/algebra',
+            tipo: 'video'
+          },
+          {
+            titulo: 'Exercícios online',
+            url: 'https://www.matemática.com/exercicios',
+            tipo: 'exercicios'
+          }
+        ]
+      },
+      tipoMaterial,
+      descricao: descricao || 'Material complementar do exercício',
+      dataEnvio: new Date().toISOString(),
+      alunosNotificados: ['João Silva', 'Maria Santos']
+    }
+  });
+});
+
+// Listar materiais de um exercício
+router.get('/:id/materiais', (req, res) => {
+  const { id } = req.params;
+  
+  console.log('=== LISTAR MATERIAIS EXERCÍCIO ===');
+  console.log('Exercício ID:', id);
+  
+  res.json({
+    message: 'Materiais do exercício',
+    data: {
+      exercicioId: parseInt(id),
+      arquivos: [
+        {
+          id: 1,
+          nome: 'lista_principal.pdf',
+          tamanho: '2.1MB',
+          tipo: 'application/pdf',
+          url: `/materiais/exercicio_${id}_lista_principal.pdf`,
+          dataUpload: '2024-01-18T10:00:00Z',
+          downloads: 5
+        },
+        {
+          id: 2,
+          nome: 'gabarito.pdf',
+          tamanho: '890KB',
+          tipo: 'application/pdf',
+          url: `/materiais/exercicio_${id}_gabarito.pdf`,
+          dataUpload: '2024-01-18T10:05:00Z',
+          downloads: 3
+        }
+      ],
+      links: [
+        {
+          id: 1,
+          titulo: 'Vídeo Aula - Equações do 2º Grau',
+          url: 'https://youtube.com/watch?v=exemplo',
+          tipo: 'video',
+          dataAdicao: '2024-01-18T10:10:00Z',
+          cliques: 8
+        }
+      ],
+      estatisticas: {
+        totalMateriais: 3,
+        totalDownloads: 8,
+        totalCliques: 8,
+        materialMaisAcessado: 'lista_principal.pdf'
+      }
+    }
+  });
+});
+
+// === TIPOS DE ARQUIVO PERMITIDOS ===
+// Verificar tipos de arquivo permitidos
+router.get('/upload/tipos-permitidos', (req, res) => {
+  console.log('=== TIPOS ARQUIVO PERMITIDOS ===');
+  
+  res.json({
+    message: 'Tipos de arquivo permitidos',
+    data: {
+      documentos: {
+        tipos: ['.pdf', '.doc', '.docx', '.txt', '.rtf'],
+        tamanhoMaximo: '10MB',
+        descricao: 'Documentos de texto e exercícios'
+      },
+      imagens: {
+        tipos: ['.jpg', '.jpeg', '.png', '.gif', '.bmp'],
+        tamanhoMaximo: '5MB',
+        descricao: 'Imagens e figuras explicativas'
+      },
+      planilhas: {
+        tipos: ['.xls', '.xlsx', '.csv'],
+        tamanhoMaximo: '8MB',
+        descricao: 'Planilhas e dados'
+      },
+      apresentacoes: {
+        tipos: ['.ppt', '.pptx'],
+        tamanhoMaximo: '15MB',
+        descricao: 'Apresentações e slides'
+      },
+      audio: {
+        tipos: ['.mp3', '.wav', '.m4a'],
+        tamanhoMaximo: '20MB',
+        descricao: 'Áudios explicativos'
+      },
+      video: {
+        tipos: ['.mp4', '.mov', '.avi'],
+        tamanhoMaximo: '50MB',
+        descricao: 'Vídeos curtos (recomendado usar links)'
+      },
+      limitesGerais: {
+        arquivosPorUpload: 5,
+        tamanhoTotalMaximo: '50MB',
+        linksPorExercicio: 10
+      }
+    }
+  });
+});
+
+// Deletar material
+router.delete('/:exercicioId/material/:materialId', (req, res) => {
+  const { exercicioId, materialId } = req.params;
+  
+  console.log('=== DELETAR MATERIAL ===');
+  console.log('Exercício ID:', exercicioId);
+  console.log('Material ID:', materialId);
+  
+  res.json({
+    message: 'Material removido com sucesso',
+    data: {
+      exercicioId: parseInt(exercicioId),
+      materialId: parseInt(materialId),
+      dataRemocao: new Date().toISOString(),
+      alunosNotificados: true
+    }
+  });
+});
+
 export { router as exercicioRoutes }; 
