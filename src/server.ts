@@ -21,65 +21,46 @@ const PORT = process.env.PORT || 3001;
 // Middlewares de segurança
 app.use(helmet());
 
-// Lista de origens permitidas (incluindo Lovable)
-const allowedOrigins = [
-  'https://preview--tutor-class-organize.lovable.app',
-  'https://tutor-class-organize.lovable.app',
-  'https://lovable.dev',
-  'https://lovable.app',
-  'https://preview.lovable.app',
-  'https://preview.lovable.dev',
-  'http://localhost:3000',
-  'http://localhost:5173',
-  'http://localhost:4173',
-  /^https:\/\/.*\.lovable\.app$/,
-  /^https:\/\/.*\.lovable\.dev$/,
-  /^https:\/\/preview--.*\.lovable\.app$/
-];
-
+// Configuração CORS ULTRA PERMISSIVA (para produção)
 app.use(cors({
-  origin: function (origin, callback) {
-    console.log('🌐 CORS CHECK - Origin:', origin);
-    
-    // Permite requisições sem origin (mobile apps, etc)
-    if (!origin) {
-      console.log('✅ CORS: Sem origin - permitido');
-      return callback(null, true);
-    }
-    
-    // Verifica se origin está na lista permitida
-    const isAllowed = allowedOrigins.some(allowedOrigin => {
-      if (typeof allowedOrigin === 'string') {
-        return allowedOrigin === origin;
-      } else {
-        return allowedOrigin.test(origin);
-      }
-    });
-    
-    if (isAllowed) {
-      console.log('✅ CORS: Origin permitida -', origin);
-      callback(null, true);
-    } else {
-      console.log('❌ CORS: Origin negada -', origin);
-      console.log('Lista permitida:', allowedOrigins.filter(o => typeof o === 'string'));
-      callback(null, true); // Temporariamente permitir todas até debug completo
-    }
-  },
+  origin: true, // Permite QUALQUER origem
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH', 'HEAD'],
+  allowedHeaders: [
+    'Content-Type', 
+    'Authorization', 
+    'X-Requested-With', 
+    'Accept', 
+    'Origin',
+    'Cache-Control',
+    'X-File-Name'
+  ],
+  exposedHeaders: ['Content-Length', 'X-Request-ID'],
   optionsSuccessStatus: 200,
-  preflightContinue: false
+  preflightContinue: false,
+  maxAge: 86400 // Cache preflight por 24h
 }));
 
-// Middleware específico para OPTIONS (preflight CORS)
-app.options('*', (req, res) => {
-  console.log('🚀 PREFLIGHT OPTIONS para:', req.originalUrl);
-  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
-  res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS,PATCH');
-  res.header('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Requested-With,Accept,Origin');
+// Headers CORS manuais para garantir compatibilidade
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  console.log('🌐 CORS MANUAL - Origin:', origin);
+  
+  // Definir headers CORS manualmente
+  res.header('Access-Control-Allow-Origin', origin || '*');
   res.header('Access-Control-Allow-Credentials', 'true');
-  res.sendStatus(200);
+  res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS,PATCH,HEAD');
+  res.header('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Requested-With,Accept,Origin,Cache-Control,X-File-Name');
+  res.header('Access-Control-Expose-Headers', 'Content-Length,X-Request-ID');
+  
+  // Se for OPTIONS (preflight), responder imediatamente
+  if (req.method === 'OPTIONS') {
+    console.log('✅ PREFLIGHT OPTIONS respondido para:', req.originalUrl);
+    return res.sendStatus(200);
+  }
+  
+  console.log('✅ CORS: Headers definidos para', origin);
+  next();
 });
 
 // === MIDDLEWARE ULTRA-DEBUG ===
@@ -151,7 +132,7 @@ app.get('/health', (req, res) => {
     status: 'OK', 
     message: 'EduManager Backend is running',
     timestamp: new Date().toISOString(),
-    version: '2.0.1' // Atualizado para forçar redeploy
+    version: '2.1.0' // CORS corrigido para Lovable
   });
 });
 
