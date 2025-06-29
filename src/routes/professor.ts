@@ -1400,6 +1400,72 @@ router.get('/exercicios/:id/detalhes', (req: AuthRequest, res) => {
   });
 });
 
+// === ROTAS PUT E DELETE PARA EXERCÍCIOS ===
+// Editar exercício
+router.put('/exercicios/:id', (req: AuthRequest, res) => {
+  const { id } = req.params;
+  const { titulo, descricao, materia, dificuldade, prazo, status } = req.body;
+  
+  console.log('=== EDITAR EXERCÍCIO (PROFESSOR) ===');
+  console.log('ID:', id);
+  console.log('Dados:', req.body);
+  console.log('Professor:', req.user?.id);
+  
+  if (!titulo || titulo.trim().length === 0) {
+    return res.status(400).json({
+      message: 'Título é obrigatório'
+    });
+  }
+  
+  // Simular atualização
+  const exercicioAtualizado = {
+    id: parseInt(id),
+    titulo: titulo.trim(),
+    descricao: descricao || 'Sem descrição',
+    materia: materia || 'Geral',
+    dificuldade: dificuldade || 'médio',
+    prazo: prazo || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    status: status || 'atualizado',
+    dataModificacao: new Date().toISOString(),
+    professorId: req.user?.id
+  };
+  
+  console.log('✅ Exercício atualizado:', exercicioAtualizado);
+  
+  res.json({
+    message: 'Exercício atualizado com sucesso',
+    data: exercicioAtualizado
+  });
+});
+
+// Excluir exercício
+router.delete('/exercicios/:id', (req: AuthRequest, res) => {
+  const { id } = req.params;
+  
+  console.log('=== EXCLUIR EXERCÍCIO (PROFESSOR) ===');
+  console.log('ID:', id);
+  console.log('Professor:', req.user?.id);
+  
+  // Simular exclusão
+  const exercicioExcluido = {
+    id: parseInt(id),
+    titulo: `Exercício ${id}`,
+    dataExclusao: new Date().toISOString(),
+    professorId: req.user?.id
+  };
+  
+  console.log('✅ Exercício excluído:', exercicioExcluido);
+  
+  res.json({
+    message: 'Exercício excluído com sucesso',
+    data: {
+      exercicioExcluido: exercicioExcluido.titulo,
+      id: parseInt(id),
+      status: 'excluido'
+    }
+  });
+});
+
 // === ROTAS PARA AGENDA E AULAS ===
 // Listar todas as aulas (para agenda)
 router.get('/agenda/aulas', (req: AuthRequest, res) => {

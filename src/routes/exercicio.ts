@@ -84,6 +84,71 @@ router.get('/:id', (req, res) => {
   });
 });
 
+// === ROTAS PUT E DELETE PARA EXERCÍCIOS COMPLETOS ===
+// Editar exercício completo
+router.put('/:id', (req, res) => {
+  const { id } = req.params;
+  const { titulo, descricao, materia, dificuldade, prazo, status } = req.body;
+  
+  console.log('=== EDITAR EXERCÍCIO ===');
+  console.log('ID:', id);
+  console.log('Dados:', req.body);
+  
+  const exercicioIndex = exerciciosMemoria.findIndex(ex => ex.id === parseInt(id));
+  
+  if (exercicioIndex === -1) {
+    return res.status(404).json({
+      message: 'Exercício não encontrado'
+    });
+  }
+  
+  const exercicio = exerciciosMemoria[exercicioIndex];
+  
+  // Atualizar campos fornecidos
+  if (titulo) exercicio.titulo = titulo;
+  if (descricao) exercicio.descricao = descricao;
+  if (materia) exercicio.materia = materia;
+  if (dificuldade) exercicio.dificuldade = dificuldade;
+  if (prazo) exercicio.prazo = prazo;
+  if (status) exercicio.status = status;
+  exercicio.dataModificacao = new Date().toISOString();
+  
+  console.log('✅ Exercício atualizado:', exercicio);
+  
+  return res.json({
+    message: 'Exercício atualizado com sucesso',
+    data: exercicio
+  });
+});
+
+// Excluir exercício completo
+router.delete('/:id', (req, res) => {
+  const { id } = req.params;
+  
+  console.log('=== EXCLUIR EXERCÍCIO ===');
+  console.log('ID:', id);
+  
+  const exercicioIndex = exerciciosMemoria.findIndex(ex => ex.id === parseInt(id));
+  
+  if (exercicioIndex === -1) {
+    return res.status(404).json({
+      message: 'Exercício não encontrado'
+    });
+  }
+  
+  const exercicioRemovido = exerciciosMemoria.splice(exercicioIndex, 1)[0];
+  
+  console.log('✅ Exercício excluído:', exercicioRemovido.titulo);
+  
+  return res.json({
+    message: 'Exercício excluído com sucesso',
+    data: {
+      exercicioRemovido: exercicioRemovido.titulo,
+      totalExercicios: exerciciosMemoria.length
+    }
+  });
+});
+
 // Exercícios por aluno
 router.get('/aluno/:alunoId', (req, res) => {
   const { alunoId } = req.params;
@@ -114,25 +179,37 @@ router.get('/aluno/:alunoId', (req, res) => {
 router.post('/', (req, res) => {
   const { titulo, descricao, materia, prazo, dificuldade, alunos } = req.body;
   
+  console.log('=== CRIAR EXERCÍCIO ===');
+  console.log('Dados recebidos:', req.body);
+  
+  if (!titulo || titulo.trim().length === 0) {
+    return res.status(400).json({
+      message: 'Título é obrigatório'
+    });
+  }
+  
   const novoExercicio = {
     id: Math.floor(Math.random() * 1000) + 100,
-    titulo,
-    descricao,
-    materia,
+    titulo: titulo.trim(),
+    descricao: descricao || 'Sem descrição',
+    materia: materia || 'Geral',
     dificuldade: dificuldade || 'médio',
-    prazo,
+    prazo: prazo || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     status: 'criado',
     dataCriacao: new Date().toISOString(),
     alunos: alunos || [],
     pontuacao: 10,
-    tipo: 'exercício'
+    tipo: 'exercício',
+    questoes: []
   };
   
   // Adicionar à lista em memória
   exerciciosMemoria.push(novoExercicio);
   
+  console.log('✅ Exercício criado:', novoExercicio);
+  
   res.json({ 
-    message: 'Exercício criado',
+    message: 'Exercício criado com sucesso',
     data: novoExercicio
   });
 });
@@ -638,6 +715,153 @@ router.get('/templates/questoes', (req, res) => {
       ],
       materias: ['Matemática', 'Física', 'Química', 'Português', 'História', 'Geografia', 'Biologia', 'Inglês'],
       dificuldades: ['fácil', 'médio', 'difícil']
+    }
+  });
+});
+
+// === ROTAS DE ALIAS PARA COMPATIBILIDADE ===
+// Alias para questao (singular) -> questoes (plural)
+router.post('/:id/questao', (req, res) => {
+  console.log('🔄 Redirecionando /questao para /questoes');
+  const { id } = req.params;
+  const { enunciado, tipo, alternativas, resposta, pontuacao } = req.body;
+  
+  const exercicio = exerciciosMemoria.find(ex => ex.id === parseInt(id));
+  
+  if (!exercicio) {
+    return res.status(404).json({
+      message: 'Exercício não encontrado'
+    });
+  }
+  
+  if (!enunciado || !tipo) {
+    return res.status(400).json({
+      message: 'Enunciado e tipo são obrigatórios'
+    });
+  }
+  
+  // Inicializar array de questões se não existir
+  if (!exercicio.questoes) {
+    exercicio.questoes = [];
+  }
+  
+  const novaQuestao = {
+    id: Date.now() + Math.random(),
+    numero: exercicio.questoes.length + 1,
+    enunciado,
+    tipo: tipo || 'dissertativa',
+    alternativas: alternativas || [],
+    resposta: resposta || '',
+    pontuacao: pontuacao || 1,
+    dataCriacao: new Date().toISOString()
+  };
+  
+  exercicio.questoes.push(novaQuestao);
+  
+  return res.status(201).json({
+    message: 'Questão adicionada com sucesso',
+    data: {
+      questao: novaQuestao,
+      totalQuestoes: exercicio.questoes.length,
+      exercicio: {
+        id: exercicio.id,
+        titulo: exercicio.titulo,
+        totalPontuacao: exercicio.questoes.reduce((total: number, q: any) => total + q.pontuacao, 0)
+      }
+    }
+  });
+});
+
+router.put('/:exercicioId/questao/:questaoId', (req, res) => {
+  console.log('🔄 Redirecionando PUT /questao para /questoes');
+  const { exercicioId, questaoId } = req.params;
+  const { enunciado, tipo, alternativas, resposta, pontuacao } = req.body;
+  
+  const exercicio = exerciciosMemoria.find(ex => ex.id === parseInt(exercicioId));
+  
+  if (!exercicio) {
+    return res.status(404).json({
+      message: 'Exercício não encontrado'
+    });
+  }
+  
+  if (!exercicio.questoes) {
+    return res.status(404).json({
+      message: 'Nenhuma questão encontrada neste exercício'
+    });
+  }
+  
+  const questao = exercicio.questoes.find((q: any) => q.id == questaoId);
+  
+  if (!questao) {
+    return res.status(404).json({
+      message: 'Questão não encontrada'
+    });
+  }
+  
+  // Atualizar questão
+  if (enunciado) questao.enunciado = enunciado;
+  if (tipo) questao.tipo = tipo;
+  if (alternativas) questao.alternativas = alternativas;
+  if (resposta !== undefined) questao.resposta = resposta;
+  if (pontuacao) questao.pontuacao = pontuacao;
+  questao.dataModificacao = new Date().toISOString();
+  
+  return res.json({
+    message: 'Questão atualizada com sucesso',
+    data: {
+      questao,
+      exercicio: {
+        id: exercicio.id,
+        titulo: exercicio.titulo,
+        totalQuestoes: exercicio.questoes.length
+      }
+    }
+  });
+});
+
+router.delete('/:exercicioId/questao/:questaoId', (req, res) => {
+  console.log('🔄 Redirecionando DELETE /questao para /questoes');
+  const { exercicioId, questaoId } = req.params;
+  
+  const exercicio = exerciciosMemoria.find(ex => ex.id === parseInt(exercicioId));
+  
+  if (!exercicio) {
+    return res.status(404).json({
+      message: 'Exercício não encontrado'
+    });
+  }
+  
+  if (!exercicio.questoes) {
+    return res.status(404).json({
+      message: 'Nenhuma questão encontrada neste exercício'
+    });
+  }
+  
+  const questaoIndex = exercicio.questoes.findIndex((q: any) => q.id == questaoId);
+  
+  if (questaoIndex === -1) {
+    return res.status(404).json({
+      message: 'Questão não encontrada'
+    });
+  }
+  
+  const questaoRemovida = exercicio.questoes.splice(questaoIndex, 1)[0];
+  
+  // Renumerar questões
+  exercicio.questoes.forEach((q: any, index: number) => {
+    q.numero = index + 1;
+  });
+  
+  return res.json({
+    message: 'Questão removida com sucesso',
+    data: {
+      questaoRemovida,
+      totalQuestoes: exercicio.questoes.length,
+      exercicio: {
+        id: exercicio.id,
+        titulo: exercicio.titulo
+      }
     }
   });
 });
