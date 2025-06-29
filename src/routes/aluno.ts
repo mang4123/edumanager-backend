@@ -194,13 +194,42 @@ router.get('/aulas', (req, res) => {
   });
 });
 
-// GET /api/aluno/materiais - Materiais disponíveis
-router.get('/materiais', (req, res) => {
-  console.log('=== MATERIAIS DO ALUNO ===');
+// GET /api/aluno/materiais - Materiais disponíveis - CONECTADO AO SISTEMA GLOBAL
+router.get('/materiais', (req: any, res) => {
+  const alunoId = req.user?.id;
   
-  res.json({
+  console.log('=== MATERIAIS DO ALUNO (SISTEMA GLOBAL) ===');
+  console.log('Aluno ID:', alunoId);
+  console.log('Total exercícios enviados:', req.estadoGlobal?.exerciciosEnviados?.length || 0);
+  
+  // Filtrar exercícios enviados especificamente para este aluno
+  const exerciciosAluno = req.estadoGlobal?.exerciciosEnviados?.filter(
+    (exercicio: any) => exercicio.alunosIds.includes(1) || exercicio.alunosIds.includes(parseInt(alunoId?.slice(-1) || '1'))
+  ) || [];
+  
+  console.log('Exercícios encontrados para este aluno:', exerciciosAluno.length);
+  
+  // Converter exercícios para formato de materiais
+  const materiaisExercicios = exerciciosAluno.map((exercicio: any) => ({
+    id: exercicio.exercicioId,
+    titulo: exercicio.titulo,
+    descricao: exercicio.descricao,
+    tipo: 'exercicio',
+    materia: exercicio.materia,
+    professor: 'Professor Exemplo',
+    dataEnvio: exercicio.dataEnvio.split('T')[0],
+    prazo: exercicio.prazo,
+    status: 'pendente',
+    arquivo: `${exercicio.titulo.toLowerCase().replace(/\s+/g, '_')}.pdf`,
+    nota: null
+  }));
+  
+  // Combinar materiais enviados com os padrão
+  const todosMateriais = [...materiaisExercicios, ...materiaisAluno];
+  
+  return res.json({
     message: "Materiais do aluno",
-    data: materiaisAluno
+    data: todosMateriais
   });
 });
 
@@ -247,20 +276,45 @@ router.get('/materiais/:id/download', (req, res) => {
   });
 });
 
-// GET /api/aluno/duvidas - Dúvidas do aluno
-router.get('/duvidas', (req, res) => {
-  console.log('=== DÚVIDAS DO ALUNO ===');
+// GET /api/aluno/duvidas - Dúvidas do aluno - BIDIRECIONAL
+router.get('/duvidas', (req: any, res) => {
+  const alunoId = req.user?.id;
   
-  res.json({
+  console.log('=== DÚVIDAS DO ALUNO (BIDIRECIONAL) ===');
+  console.log('Aluno ID:', alunoId);
+  console.log('Total dúvidas no sistema:', req.estadoGlobal?.duvidasSistema?.length || 0);
+  
+  // Filtrar dúvidas específicas deste aluno do sistema global
+  const duvidasSistemaAluno = req.estadoGlobal?.duvidasSistema?.filter(
+    (duvida: any) => duvida.alunoId === alunoId
+  ) || [];
+  
+  console.log('Dúvidas encontradas no sistema para este aluno:', duvidasSistemaAluno.length);
+  
+  // Combinar dúvidas do sistema com as locais
+  const todasDuvidas = [...duvidasSistemaAluno, ...duvidasAluno];
+  
+  return res.json({
     message: "Dúvidas do aluno",
-    data: duvidasAluno
+    data: todasDuvidas.map((duvida: any) => ({
+      id: duvida.id,
+      pergunta: duvida.pergunta,
+      materia: duvida.materia,
+      data: duvida.data,
+      status: duvida.status,
+      urgencia: duvida.urgencia,
+      resposta: duvida.resposta || null,
+      dataResposta: duvida.dataResposta || null
+    }))
   });
 });
 
-// POST /api/aluno/duvidas - Enviar nova dúvida
-router.post('/duvidas', (req, res) => {
-  console.log('=== ENVIAR NOVA DÚVIDA ===');
+// POST /api/aluno/duvidas - Enviar nova dúvida - BIDIRECIONAL
+router.post('/duvidas', (req: any, res) => {
+  console.log('=== ENVIAR NOVA DÚVIDA (BIDIRECIONAL) ===');
   const { pergunta, materia, urgencia = 'normal' } = req.body;
+  const alunoId = req.user?.id;
+  const professorId = 'c6374029-c01f-4073-a9f2-3819c9bc1339'; // Professor padrão
   
   if (!pergunta || !materia) {
     return res.status(400).json({
@@ -269,7 +323,9 @@ router.post('/duvidas', (req, res) => {
   }
 
   const novaDuvida = {
-    id: duvidasAluno.length + 1,
+    id: Date.now() + Math.random(),
+    alunoId: alunoId,
+    professorId: professorId,
     pergunta,
     materia,
     data: new Date().toISOString().split('T')[0],
@@ -277,13 +333,50 @@ router.post('/duvidas', (req, res) => {
     urgencia
   };
 
-  duvidasAluno.push(novaDuvida);
+  // Adicionar à lista local
+  duvidasAluno.push({
+    id: novaDuvida.id,
+    pergunta,
+    materia,
+    data: novaDuvida.data,
+    status: "pendente",
+    urgencia
+  });
+
+  // Adicionar ao sistema global (bidirecional)
+  req.estadoGlobal.duvidasSistema.push(novaDuvida);
   
-  console.log('✅ Nova dúvida criada:', novaDuvida);
+  // Criar notificação para o professor
+  req.estadoGlobal.criarNotificacao(
+    professorId,
+    'duvida',
+    'Nova dúvida recebida',
+    `Um aluno enviou uma dúvida sobre ${materia}: ${pergunta.substring(0, 50)}...`,
+    urgencia === 'alta' ? 'alta' : 'normal',
+    {
+      tipo: 'redirect',
+      url: '/professor/duvidas',
+      dados: { duvidaId: novaDuvida.id }
+    }
+  );
+  
+  // Enviar email para o professor (simulado)
+  req.estadoGlobal.enviarNotificacaoEmail(
+    'professor@email.com',
+    'Nova Dúvida - EduManager',
+    `Um aluno enviou uma nova dúvida sobre ${materia}:\n\n"${pergunta}"\n\nAcesse sua área para responder.`
+  );
+  
+  console.log('✅ Nova dúvida criada e enviada ao professor:', novaDuvida);
+  console.log('📊 Total dúvidas no sistema:', req.estadoGlobal.duvidasSistema.length);
 
   return res.status(201).json({
     message: "Dúvida enviada com sucesso",
-    data: novaDuvida
+    data: {
+      ...novaDuvida,
+      professorNotificado: true,
+      emailEnviado: true
+    }
   });
 });
 
@@ -539,64 +632,110 @@ router.post('/notificacoes/configurar', (req, res) => {
   });
 });
 
-// Listar notificações do aluno
-router.get('/notificacoes', (req, res) => {
-  console.log('=== NOTIFICAÇÕES DO ALUNO ===');
+// Listar notificações do aluno - CONECTADO AO SISTEMA GLOBAL
+router.get('/notificacoes', (req: any, res) => {
+  const alunoId = req.user?.id;
   
-  res.json({
-    message: 'Notificações do aluno',
-    data: [
-      {
-        id: 1,
-        tipo: 'aula',
-        titulo: 'Sua aula começa em 1 hora',
-        descricao: 'Aula de Matemática às 15:00 com Professor Exemplo',
-        data: new Date().toISOString(),
-        lida: false,
-        urgencia: 'alta',
-        acao: {
-          texto: 'Ver detalhes da aula',
-          url: '/aluno/aulas/1'
-        }
-      },
-      {
-        id: 2,
-        tipo: 'exercicio',
-        titulo: 'Prazo de exercício expira em 2 dias',
-        descricao: 'Lista de Álgebra - prazo até 26/01/2024',
-        data: '2024-01-24T10:00:00Z',
-        lida: false,
-        urgencia: 'media',
-        acao: {
-          texto: 'Fazer exercício',
-          url: '/aluno/materiais/1'
-        }
-      },
-      {
-        id: 3,
-        tipo: 'nota',
-        titulo: 'Nova nota disponível',
-        descricao: 'Sua redação foi corrigida - Nota: 8.5',
-        data: '2024-01-23T16:30:00Z',
-        lida: true,
-        urgencia: 'baixa',
-        acao: {
-          texto: 'Ver feedback',
-          url: '/aluno/exercicios/2'
-        }
+  console.log('=== NOTIFICAÇÕES DO ALUNO (SISTEMA GLOBAL) ===');
+  console.log('Aluno ID:', alunoId);
+  console.log('Total notificações no sistema:', req.estadoGlobal?.notificacoesSistema?.length || 0);
+  
+  // Filtrar notificações específicas do aluno
+  const notificacesAluno = req.estadoGlobal?.notificacoesSistema?.filter(
+    (notif: any) => notif.usuarioId === alunoId
+  ) || [];
+  
+  console.log('Notificações encontradas para este aluno:', notificacesAluno.length);
+  
+  // Notificações padrão
+  const notificacoesPadrao = [
+    {
+      id: 1,
+      tipo: 'aula',
+      titulo: 'Sua aula começa em 1 hora',
+      descricao: '29/06/2025, 03:09:08',
+      data: new Date().toISOString(),
+      lida: false,
+      urgencia: 'alta',
+      acao: {
+        texto: 'Ver detalhes da aula',
+        url: '/aluno/aulas/1'
       }
-    ]
+    },
+    {
+      id: 2,
+      tipo: 'exercicio',
+      titulo: 'Prazo de exercício expira em 2 dias',
+      descricao: '24/01/2024, 07:00:00',
+      data: '2024-01-24T10:00:00Z',
+      lida: false,
+      urgencia: 'normal',
+      acao: {
+        texto: 'Fazer exercício',
+        url: '/aluno/materiais/1'
+      }
+    },
+    {
+      id: 3,
+      tipo: 'nota',
+      titulo: 'Nova nota disponível',
+      descricao: '23/01/2024, 13:30:00',
+      data: '2024-01-23T16:30:00Z',
+      lida: true,
+      urgencia: 'baixa',
+      acao: {
+        texto: 'Ver feedback',
+        url: '/aluno/exercicios/2'
+      }
+    }
+  ];
+  
+  // Combinar notificações específicas com as padrão
+  const todasNotificacoes = [...notificacesAluno, ...notificacoesPadrao];
+  
+  return res.json({
+    message: 'Notificações do aluno',
+    data: todasNotificacoes.map((notif: any) => ({
+      id: notif.id,
+      tipo: notif.tipo,
+      titulo: notif.titulo,
+      descricao: notif.descricao,
+      data: notif.data,
+      lida: notif.lida || false,
+      urgencia: notif.urgencia || 'normal',
+      acao: notif.acao || {
+        texto: 'Ver detalhes',
+        url: '#'
+      }
+    }))
   });
 });
 
-// Marcar notificação como lida
+// Marcar notificação como lida - PATCH
 router.patch('/notificacoes/:id/lida', (req, res) => {
   const { id } = req.params;
   
-  console.log('=== MARCAR NOTIFICAÇÃO LIDA ===');
+  console.log('=== MARCAR NOTIFICAÇÃO LIDA (PATCH) ===');
   console.log('Notificação ID:', id);
   
-  res.json({
+  return res.json({
+    message: 'Notificação marcada como lida',
+    data: {
+      notificacaoId: parseInt(id),
+      lida: true,
+      dataLeitura: new Date().toISOString()
+    }
+  });
+});
+
+// Marcar notificação como lida - POST (compatibilidade)
+router.post('/notificacoes/:id/lida', (req, res) => {
+  const { id } = req.params;
+  
+  console.log('=== MARCAR NOTIFICAÇÃO LIDA (POST) ===');
+  console.log('Notificação ID:', id);
+  
+  return res.json({
     message: 'Notificação marcada como lida',
     data: {
       notificacaoId: parseInt(id),

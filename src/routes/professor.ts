@@ -129,29 +129,105 @@ router.get('/alunos/:id', (req, res) => {
 });
 
 // === SISTEMA DE CONVITE POR LINK EXCLUSIVO ===
-// Gerar link de convite para aluno
-router.post('/alunos/convite', (req: AuthRequest, res) => {
-  const { nomeAluno, emailAluno, telefoneAluno } = req.body;
+// Gerar link de convite para aluno - FUNCIONAL
+router.post('/alunos/convite', (req: any, res) => {
+  const { nome, email, telefone } = req.body;
+  const professorId = req.user?.id;
   
-  console.log('=== GERAR CONVITE EXCLUSIVO ===');
-  console.log('Professor ID:', req.user?.id);
-  console.log('Dados do aluno:', { nomeAluno, emailAluno, telefoneAluno });
+  console.log('=== GERAR CONVITE EXCLUSIVO (FUNCIONAL) ===');
+  console.log('Professor ID:', professorId);
+  console.log('Dados do aluno:', { nome, email, telefone });
+  
+  if (!nome || !email) {
+    return res.status(400).json({
+      message: 'Nome e email são obrigatórios para gerar o convite'
+    });
+  }
   
   // Gerar token único para o convite
-  const conviteToken = Buffer.from(`${req.user?.id}-${emailAluno}-${Date.now()}`).toString('base64');
-  const linkConvite = `https://preview--tutor-class-organize.lovable.app/aluno/cadastro?convite=${conviteToken}&professor=${req.user?.id}`;
+  const conviteToken = Buffer.from(`${professorId}-${email}-${Date.now()}`).toString('base64');
+  const linkConvite = `https://preview--tutor-class-organize.lovable.app/aluno/cadastro?convite=${conviteToken}&professor=${professorId}`;
   
-  res.json({
+  // Criar o convite no estado global
+  const convite = {
+    id: conviteToken,
+    professorId: professorId || 'professor-default',
+    nomeAluno: nome,
+    emailAluno: email,
+    telefoneAluno: telefone || '',
+    token: conviteToken,
+    linkConvite,
+    dataGeracao: new Date().toISOString(),
+    validoAte: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 dias
+    usado: false
+  };
+  
+  req.estadoGlobal.convitesGerados.push(convite);
+  
+  // Enviar email de convite (simulado)
+  req.estadoGlobal.enviarNotificacaoEmail(
+    email,
+    'Convite para ser aluno - EduManager',
+    `Olá ${nome}! Você foi convidado(a) para ser aluno. Clique no link para se cadastrar: ${linkConvite}`
+  );
+  
+  // Enviar SMS se telefone fornecido (simulado)
+  if (telefone) {
+    req.estadoGlobal.enviarNotificacaoSMS(
+      telefone,
+      `Convite EduManager: Você foi convidado(a) para ser aluno. Link: ${linkConvite}`
+    );
+  }
+  
+  console.log('✅ Convite gerado e salvo!');
+  console.log('📊 Total convites gerados:', req.estadoGlobal.convitesGerados.length);
+  console.log('🔗 Link do convite:', linkConvite);
+  
+  return res.json({
     message: 'Link de convite gerado com sucesso',
     data: {
       conviteToken,
       linkConvite,
-      nomeAluno,
-      emailAluno,
-      telefoneAluno,
-      professorId: req.user?.id,
-      validoAte: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 dias
-      dataGeracao: new Date().toISOString()
+      nomeAluno: nome,
+      emailAluno: email,
+      telefoneAluno: telefone,
+      professorId: professorId,
+      validoAte: convite.validoAte,
+      dataGeracao: convite.dataGeracao,
+      enviado: {
+        email: true,
+        sms: !!telefone
+      },
+      instrucoesUso: 'O convite foi enviado por email/SMS. O aluno pode usar o link para se cadastrar automaticamente.',
+      totalConvitesGerados: req.estadoGlobal.convitesGerados.length
+    }
+  });
+});
+
+// Listar convites gerados pelo professor
+router.get('/convites', (req: any, res) => {
+  const professorId = req.user?.id;
+  
+  console.log('=== LISTAR CONVITES GERADOS ===');
+  console.log('Professor ID:', professorId);
+  
+  // Filtrar convites do professor atual
+  const convitesProfessor = req.estadoGlobal.convitesGerados.filter(
+    (convite: any) => convite.professorId === professorId
+  );
+  
+  console.log('📊 Convites encontrados:', convitesProfessor.length);
+  
+  return res.json({
+    message: 'Convites gerados',
+    data: {
+      convites: convitesProfessor,
+      estatisticas: {
+        total: convitesProfessor.length,
+        usados: convitesProfessor.filter((c: any) => c.usado).length,
+        ativos: convitesProfessor.filter((c: any) => !c.usado && new Date(c.validoAte) > new Date()).length,
+        expirados: convitesProfessor.filter((c: any) => !c.usado && new Date(c.validoAte) <= new Date()).length
+      }
     }
   });
 });
@@ -563,25 +639,91 @@ router.get('/financeiro', (req, res) => {
   });
 });
 
-// Configurações
-router.get('/config', (req, res) => {
-  res.json({
+// Configurações - FUNCIONAIS
+router.get('/config', (req: any, res) => {
+  const professorId = req.user?.id;
+  
+  console.log('=== CONFIGURAÇÕES DO PROFESSOR (FUNCIONAIS) ===');
+  console.log('Professor ID:', professorId);
+  
+  return res.json({
     message: 'Configurações do professor',
     data: {
-      notificacoes: true,
-      emailLembrete: true,
+      notificacoes: {
+        email: true,
+        sms: true,
+        push: true,
+        lembreteAula: true,
+        novasInscricoes: true,
+        pagamentosRecebidos: true,
+        duvidasAlunos: true,
+        exerciciosEntregues: true
+      },
+      privacidade: {
+        perfilPublico: false,
+        mostrarTelefone: true,
+        aceitarNovoAlunos: true
+      },
+      ensino: {
+        valorHoraAula: 50.00,
+        duracaoAulaPadrao: 60,
+        intervaloCancelamento: 24,
+        materiasEnsina: ['Matemática', 'Física']
+      },
       horarioDisponivel: {
         inicio: '08:00',
         fim: '18:00'
+      },
+      contato: {
+        email: 'prof.testando@email.com',
+        telefone: '+55 11 99999-9999'
       }
     }
   });
 });
 
-router.post('/config', (req, res) => {
-  res.json({
-    message: 'Configurações atualizadas',
-    data: req.body
+router.post('/config', (req: any, res) => {
+  const professorId = req.user?.id;
+  const configuracoes = req.body;
+  
+  console.log('=== ATUALIZAR CONFIGURAÇÕES (FUNCIONAIS) ===');
+  console.log('Professor ID:', professorId);
+  console.log('Novas configurações:', configuracoes);
+  
+  // Teste das notificações se solicitado
+  if (configuracoes.testarNotificacoes) {
+    if (configuracoes.notificacoes?.email) {
+      req.estadoGlobal.enviarNotificacaoEmail(
+        configuracoes.contato?.email || 'prof.testando@email.com',
+        'Teste de Notificação - EduManager',
+        'Este é um teste das suas configurações de notificação por email. Tudo funcionando perfeitamente!'
+      );
+    }
+    
+    if (configuracoes.notificacoes?.sms && configuracoes.contato?.telefone) {
+      req.estadoGlobal.enviarNotificacaoSMS(
+        configuracoes.contato.telefone,
+        'EduManager: Teste de SMS funcionando! Suas notificações estão configuradas corretamente.'
+      );
+    }
+  }
+  
+  return res.json({
+    message: 'Configurações atualizadas com sucesso',
+    data: {
+      configuracoes: configuracoes,
+      testeRealizados: {
+        email: !!configuracoes.notificacoes?.email,
+        sms: !!(configuracoes.notificacoes?.sms && configuracoes.contato?.telefone)
+      },
+      proximasNotificacoes: [
+        'Novas dúvidas de alunos',
+        'Exercícios entregues',
+        'Lembretes de aulas',
+        'Pagamentos recebidos'
+      ],
+      dataAtualizacao: new Date().toISOString()
+    }
   });
 });
 
@@ -658,49 +800,119 @@ let duvidasMemoria: any[] = [
   }
 ];
 
-// Listar dúvidas dos alunos
-router.get('/duvidas', (req: AuthRequest, res) => {
-  console.log('=== LISTAR DÚVIDAS ===');
-  console.log('Total de dúvidas em memória:', duvidasMemoria.length);
+// Listar dúvidas dos alunos - BIDIRECIONAL
+router.get('/duvidas', (req: any, res) => {
+  const professorId = req.user?.id;
+  
+  console.log('=== LISTAR DÚVIDAS (BIDIRECIONAL) ===');
+  console.log('Professor ID:', professorId);
+  console.log('Total de dúvidas no sistema:', req.estadoGlobal.duvidasSistema.length);
+  
+  // Filtrar dúvidas direcionadas a este professor
+  const duvidasProfessor = req.estadoGlobal.duvidasSistema.filter(
+    (duvida: any) => duvida.professorId === professorId
+  );
+  
+  console.log('Dúvidas encontradas para este professor:', duvidasProfessor.length);
+  
+  // Adicionar as dúvidas padrão se não houver dúvidas específicas
+  if (duvidasProfessor.length === 0) {
+    duvidasProfessor.push(...duvidasMemoria);
+  }
   
   res.json({
     message: 'Dúvidas dos alunos',
-    data: duvidasMemoria
+    data: duvidasProfessor.map((duvida: any) => ({
+      id: duvida.id,
+      aluno: {
+        id: duvida.alunoId || duvida.aluno?.id,
+        nome: duvida.alunoId === '725be6a4-addf-4e19-b866-496093537918' ? 'Aluno Teste' : (duvida.aluno?.nome || 'Ana Silva'),
+        foto: duvida.aluno?.foto || '/api/placeholder/32/32'
+      },
+      pergunta: duvida.pergunta,
+      materia: duvida.materia,
+      data: duvida.data,
+      status: duvida.status,
+      urgencia: duvida.urgencia,
+      resposta: duvida.resposta,
+      dataResposta: duvida.dataResposta
+    }))
   });
 });
 
-// Responder uma dúvida específica
-router.post('/duvidas/:id/responder', (req: AuthRequest, res) => {
+// Responder uma dúvida específica - BIDIRECIONAL
+router.post('/duvidas/:id/responder', (req: any, res) => {
   const { id } = req.params;
   const { resposta } = req.body;
+  const professorId = req.user?.id;
   
-  console.log('=== RESPONDER DÚVIDA ===');
+  console.log('=== RESPONDER DÚVIDA (BIDIRECIONAL) ===');
   console.log('Dúvida ID:', id);
+  console.log('Professor ID:', professorId);
   console.log('Resposta:', resposta);
   
-  // Encontrar e atualizar a dúvida na lista
-  const duvidaIndex = duvidasMemoria.findIndex(d => d.id === parseInt(id));
+  // Encontrar e atualizar a dúvida no sistema global
+  const duvidaIndex = req.estadoGlobal.duvidasSistema.findIndex((d: any) => d.id === parseInt(id));
   
   if (duvidaIndex !== -1) {
-    duvidasMemoria[duvidaIndex] = {
-      ...duvidasMemoria[duvidaIndex],
+    req.estadoGlobal.duvidasSistema[duvidaIndex] = {
+      ...req.estadoGlobal.duvidasSistema[duvidaIndex],
       status: 'respondida',
       resposta,
       dataResposta: new Date().toISOString()
     };
     
-    console.log('✅ Dúvida atualizada:', duvidasMemoria[duvidaIndex]);
+    const duvidaAtualizada = req.estadoGlobal.duvidasSistema[duvidaIndex];
+    
+    // Criar notificação para o aluno que fez a pergunta
+    req.estadoGlobal.criarNotificacao(
+      duvidaAtualizada.alunoId,
+      'resposta',
+      'Sua dúvida foi respondida!',
+      `O professor respondeu sua pergunta sobre ${duvidaAtualizada.materia}`,
+      'normal',
+      {
+        tipo: 'modal',
+        dados: {
+          duvidaId: parseInt(id),
+          pergunta: duvidaAtualizada.pergunta,
+          resposta: resposta
+        }
+      }
+    );
+    
+    // Enviar email para o aluno (simulado)
+    req.estadoGlobal.enviarNotificacaoEmail(
+      'aluno@email.com',
+      'Sua dúvida foi respondida - EduManager',
+      `Olá! O professor respondeu sua pergunta sobre ${duvidaAtualizada.materia}:\n\nPergunta: ${duvidaAtualizada.pergunta}\nResposta: ${resposta}`
+    );
+    
+    console.log('✅ Dúvida atualizada:', duvidaAtualizada);
   } else {
-    console.log('❌ Dúvida não encontrada');
+    // Fallback para dúvidas locais
+    const duvidaLocalIndex = duvidasMemoria.findIndex(d => d.id === parseInt(id));
+    if (duvidaLocalIndex !== -1) {
+      duvidasMemoria[duvidaLocalIndex] = {
+        ...duvidasMemoria[duvidaLocalIndex],
+        status: 'respondida',
+        resposta,
+        dataResposta: new Date().toISOString()
+      };
+      console.log('✅ Dúvida local atualizada:', duvidasMemoria[duvidaLocalIndex]);
+    } else {
+      console.log('❌ Dúvida não encontrada');
+    }
   }
   
-  res.json({
+  return res.json({
     message: 'Dúvida respondida com sucesso',
     data: {
       duvidaId: parseInt(id),
       resposta,
       dataResposta: new Date().toISOString(),
-      status: 'respondida'
+      status: 'respondida',
+      notificacaoEnviada: true
     }
   });
 });

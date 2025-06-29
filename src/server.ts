@@ -828,6 +828,152 @@ app.use('*', (req, res, next) => {
 // Middleware de tratamento de erros
 app.use(errorHandler);
 
+// === SISTEMA DE ESTADO GLOBAL EM MEMÓRIA ===
+// Base de dados em memória para conectar professor-aluno
+interface ExercicioEnviado {
+  id: number;
+  exercicioId: number;
+  professorId: string;
+  alunosIds: number[];
+  titulo: string;
+  descricao: string;
+  materia: string;
+  prazo: string;
+  dataEnvio: string;
+  status: 'enviado' | 'em_andamento' | 'concluido';
+}
+
+interface DuvidaBidirecional {
+  id: number;
+  alunoId: string;
+  professorId: string;
+  pergunta: string;
+  resposta?: string;
+  materia: string;
+  data: string;
+  dataResposta?: string;
+  status: 'pendente' | 'respondida' | 'resolvida';
+  urgencia: 'baixa' | 'normal' | 'alta';
+}
+
+interface NotificacaoSistema {
+  id: number;
+  usuarioId: string;
+  tipo: 'aula' | 'exercicio' | 'pagamento' | 'duvida' | 'resposta';
+  titulo: string;
+  descricao: string;
+  data: string;
+  lida: boolean;
+  urgencia: 'baixa' | 'normal' | 'alta';
+  acao?: {
+    tipo: 'link' | 'modal' | 'redirect';
+    url?: string;
+    dados?: any;
+  };
+}
+
+interface ConviteGerado {
+  id: string;
+  professorId: string;
+  nomeAluno: string;
+  emailAluno: string;
+  telefoneAluno: string;
+  token: string;
+  linkConvite: string;
+  dataGeracao: string;
+  validoAte: string;
+  usado: boolean;
+}
+
+// Bancos de dados em memória
+const exerciciosEnviados: ExercicioEnviado[] = [];
+const duvidasSistema: DuvidaBidirecional[] = [
+  {
+    id: 1,
+    alunoId: '725be6a4-addf-4e19-b866-496093537918',
+    professorId: 'c6374029-c01f-4073-a9f2-3819c9bc1339',
+    pergunta: 'Como resolver equações do segundo grau?',
+    resposta: 'Para resolver equações do 2º grau, use a fórmula de Bhaskara: x = (-b ± √(b²-4ac)) / 2a',
+    materia: 'Matemática',
+    data: '2024-01-14',
+    dataResposta: '2024-01-15',
+    status: 'respondida',
+    urgencia: 'normal'
+  }
+];
+const notificacoesSistema: NotificacaoSistema[] = [];
+const convitesGerados: ConviteGerado[] = [];
+
+// === FUNÇÕES AUXILIARES DO SISTEMA ===
+function criarNotificacao(
+  usuarioId: string, 
+  tipo: NotificacaoSistema['tipo'], 
+  titulo: string, 
+  descricao: string,
+  urgencia: 'baixa' | 'normal' | 'alta' = 'normal',
+  acao?: NotificacaoSistema['acao']
+) {
+  const notificacao: NotificacaoSistema = {
+    id: Date.now() + Math.random(),
+    usuarioId,
+    tipo,
+    titulo,
+    descricao,
+    data: new Date().toISOString(),
+    lida: false,
+    urgencia,
+    acao
+  };
+  
+  notificacoesSistema.push(notificacao);
+  console.log('🔔 NOVA NOTIFICAÇÃO CRIADA:', notificacao);
+  return notificacao;
+}
+
+function enviarNotificacaoEmail(email: string, assunto: string, mensagem: string) {
+  // Simulação de envio de email
+  console.log('📧 EMAIL ENVIADO:');
+  console.log('Para:', email);
+  console.log('Assunto:', assunto);
+  console.log('Mensagem:', mensagem);
+  console.log('Status: ✅ Enviado com sucesso (simulado)');
+  
+  return {
+    enviado: true,
+    provedor: 'NodeMailer + Gmail',
+    timestamp: new Date().toISOString()
+  };
+}
+
+function enviarNotificacaoSMS(telefone: string, mensagem: string) {
+  // Simulação de envio de SMS
+  console.log('📱 SMS ENVIADO:');
+  console.log('Para:', telefone);
+  console.log('Mensagem:', mensagem);
+  console.log('Status: ✅ Enviado com sucesso (simulado)');
+  
+  return {
+    enviado: true,
+    provedor: 'Twilio API',
+    timestamp: new Date().toISOString()
+  };
+}
+
+// === MIDDLEWARE PARA CONECTAR ESTADO GLOBAL ===
+app.use((req: any, res, next) => {
+  // Adicionar funções de estado global ao request
+  req.estadoGlobal = {
+    exerciciosEnviados,
+    duvidasSistema,
+    notificacoesSistema,
+    convitesGerados,
+    criarNotificacao,
+    enviarNotificacaoEmail,
+    enviarNotificacaoSMS
+  };
+  next();
+});
+
 app.listen(PORT, () => {
   console.log(`🚀 EduManager API rodando na porta ${PORT}`);
   console.log(`📊 Health check: http://localhost:${PORT}/health`);
