@@ -180,7 +180,7 @@ router.get('/convites/:token/validar', (req: AuthRequest, res) => {
       });
     }
     
-    res.json({
+    return res.json({
       message: 'Convite válido',
       data: {
         valido: true,
@@ -191,7 +191,7 @@ router.get('/convites/:token/validar', (req: AuthRequest, res) => {
     });
     
   } catch (error) {
-    res.status(400).json({
+    return res.status(400).json({
       message: 'Token de convite inválido',
       data: { valido: false, motivo: 'Token malformado ou inválido' }
     });

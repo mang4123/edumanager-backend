@@ -393,7 +393,7 @@ router.delete('/aulas/:aulaId/desmarcar', (req, res) => {
     });
   }
   
-  res.json({
+  return res.json({
     message: 'Aula desmarcada com sucesso',
     data: {
       aulaId: parseInt(aulaId),

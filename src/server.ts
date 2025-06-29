@@ -60,7 +60,7 @@ app.use((req, res, next) => {
   }
   
   console.log('✅ CORS: Headers definidos para', origin);
-  next();
+  return next();
 });
 
 // === MIDDLEWARE ULTRA-DEBUG ===
