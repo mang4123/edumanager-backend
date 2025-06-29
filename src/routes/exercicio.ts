@@ -6,43 +6,49 @@ const router = Router();
 // Todas as rotas precisam de autenticação
 router.use(authenticateToken);
 
+// Lista de exercícios em memória
+let exerciciosMemoria: any[] = [
+  {
+    id: 1,
+    titulo: 'Equações do 2º grau',
+    descricao: 'Resolva as equações propostas e justifique sua resposta',
+    materia: 'Matemática',
+    dificuldade: 'médio',
+    prazo: '2024-01-25',
+    status: 'enviado',
+    dataEnvio: '2024-01-18',
+    alunos: [
+      { id: 1, nome: 'João Silva', status: 'pendente' },
+      { id: 2, nome: 'Maria Santos', status: 'entregue' }
+    ],
+    pontuacao: 10,
+    tipo: 'lista'
+  },
+  {
+    id: 2,
+    titulo: 'Leis de Newton',
+    descricao: 'Questões sobre as três leis de Newton',
+    materia: 'Física',
+    dificuldade: 'fácil',
+    prazo: '2024-01-22',
+    status: 'corrigido',
+    dataEnvio: '2024-01-15',
+    alunos: [
+      { id: 2, nome: 'Maria Santos', status: 'corrigido', nota: 9.0 }
+    ],
+    pontuacao: 8,
+    tipo: 'questões'
+  }
+];
+
 // Listar exercícios
 router.get('/', (req, res) => {
+  console.log('=== LISTAR EXERCÍCIOS ===');
+  console.log('Total de exercícios em memória:', exerciciosMemoria.length);
+  
   res.json({ 
     message: 'Lista de exercícios',
-    data: [
-      {
-        id: 1,
-        titulo: 'Equações do 2º grau',
-        descricao: 'Resolva as equações propostas e justifique sua resposta',
-        materia: 'Matemática',
-        dificuldade: 'médio',
-        prazo: '2024-01-25',
-        status: 'enviado',
-        dataEnvio: '2024-01-18',
-        alunos: [
-          { id: 1, nome: 'João Silva', status: 'pendente' },
-          { id: 2, nome: 'Maria Santos', status: 'entregue' }
-        ],
-        pontuacao: 10,
-        tipo: 'lista'
-      },
-      {
-        id: 2,
-        titulo: 'Leis de Newton',
-        descricao: 'Questões sobre as três leis de Newton',
-        materia: 'Física',
-        dificuldade: 'fácil',
-        prazo: '2024-01-22',
-        status: 'corrigido',
-        dataEnvio: '2024-01-15',
-        alunos: [
-          { id: 2, nome: 'Maria Santos', status: 'corrigido', nota: 9.0 }
-        ],
-        pontuacao: 8,
-        tipo: 'questões'
-      }
-    ]
+    data: exerciciosMemoria
   });
 });
 
@@ -108,14 +114,34 @@ router.get('/aluno/:alunoId', (req, res) => {
 
 // Criar exercício (apenas professor)
 router.post('/', (req, res) => {
+  console.log('=== CRIAR EXERCÍCIO ===');
+  console.log('Dados recebidos:', req.body);
+  
+  const { titulo, descricao, materia, prazo, dificuldade, alunos } = req.body;
+  
+  const novoExercicio = {
+    id: Math.floor(Math.random() * 1000) + 100,
+    titulo,
+    descricao,
+    materia,
+    dificuldade: dificuldade || 'médio',
+    prazo,
+    status: 'criado',
+    dataCriacao: new Date().toISOString(),
+    alunos: alunos || [],
+    pontuacao: 10,
+    tipo: 'exercício'
+  };
+  
+  // Adicionar à lista em memória
+  exerciciosMemoria.push(novoExercicio);
+  
+  console.log('✅ Exercício criado e adicionado! Total:', exerciciosMemoria.length);
+  console.log('Novo exercício:', novoExercicio);
+  
   res.json({ 
     message: 'Exercício criado',
-    data: {
-      id: 3,
-      ...req.body,
-      status: 'criado',
-      dataCriacao: new Date().toISOString()
-    }
+    data: novoExercicio
   });
 });
 

@@ -316,13 +316,29 @@ router.put('/:id', (req, res) => {
     });
   }
   
-  // Atualizar aula
+  // Mapear aluno_id para dados do aluno
+  let alunoAtualizado = aulasMemoria[aulaIndex].aluno;
+  if (req.body.aluno_id) {
+    const alunosMap: Record<number, { id: number; nome: string; email: string }> = {
+      1: { id: 1, nome: 'João Silva', email: 'joao@email.com' },
+      2: { id: 2, nome: 'Maria Santos', email: 'maria@email.com' }
+    };
+    alunoAtualizado = alunosMap[req.body.aluno_id] || alunoAtualizado;
+  }
+  
+  // Atualizar aula corretamente
   aulasMemoria[aulaIndex] = {
     ...aulasMemoria[aulaIndex],
-    ...req.body,
+    aluno: alunoAtualizado,
+    data: req.body.data || aulasMemoria[aulaIndex].data,
+    horario: req.body.horario || aulasMemoria[aulaIndex].horario,
+    materia: req.body.materia || aulasMemoria[aulaIndex].materia,
+    tipo: req.body.tipo || aulasMemoria[aulaIndex].tipo,
     status: 'atualizada',
     dataAlteracao: new Date().toISOString()
   };
+  
+  console.log('✅ Aula atualizada:', aulasMemoria[aulaIndex]);
   
   return res.json({ 
     message: 'Aula atualizada com sucesso',

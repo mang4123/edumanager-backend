@@ -295,40 +295,46 @@ router.get('/stats', (req: AuthRequest, res) => {
 });
 
 // === ROTAS PARA DÚVIDAS ===
+// Lista de dúvidas em memória
+let duvidasMemoria: any[] = [
+  {
+    id: 1,
+    aluno: {
+      id: 1,
+      nome: 'Ana Silva',
+      foto: '/api/placeholder/32/32'
+    },
+    pergunta: 'Como resolver equações do segundo grau?',
+    materia: 'Matemática',
+    data: '2024-01-14',
+    status: 'pendente',
+    urgencia: 'normal'
+  },
+  {
+    id: 2,
+    aluno: {
+      id: 2,
+      nome: 'Carlos Santos',
+      foto: '/api/placeholder/32/32'
+    },
+    pergunta: 'Qual a diferença entre ser e estar?',
+    materia: 'Português',
+    data: '2024-01-13',
+    status: 'respondida',
+    resposta: 'Ser indica características permanentes, estar indica estados temporários.',
+    dataResposta: '2024-01-13',
+    urgencia: 'baixa'
+  }
+];
+
 // Listar dúvidas dos alunos
 router.get('/duvidas', (req: AuthRequest, res) => {
+  console.log('=== LISTAR DÚVIDAS ===');
+  console.log('Total de dúvidas em memória:', duvidasMemoria.length);
+  
   res.json({
     message: 'Dúvidas dos alunos',
-    data: [
-      {
-        id: 1,
-        aluno: {
-          id: 1,
-          nome: 'Ana Silva',
-          foto: '/api/placeholder/32/32'
-        },
-        pergunta: 'Como resolver equações do segundo grau?',
-        materia: 'Matemática',
-        data: '2024-01-14',
-        status: 'pendente',
-        urgencia: 'normal'
-      },
-      {
-        id: 2,
-        aluno: {
-          id: 2,
-          nome: 'Carlos Santos',
-          foto: '/api/placeholder/32/32'
-        },
-        pergunta: 'Qual a diferença entre ser e estar?',
-        materia: 'Português',
-        data: '2024-01-13',
-        status: 'respondida',
-        resposta: 'Ser indica características permanentes, estar indica estados temporários.',
-        dataResposta: '2024-01-13',
-        urgencia: 'baixa'
-      }
-    ]
+    data: duvidasMemoria
   });
 });
 
@@ -336,6 +342,26 @@ router.get('/duvidas', (req: AuthRequest, res) => {
 router.post('/duvidas/:id/responder', (req: AuthRequest, res) => {
   const { id } = req.params;
   const { resposta } = req.body;
+  
+  console.log('=== RESPONDER DÚVIDA ===');
+  console.log('Dúvida ID:', id);
+  console.log('Resposta:', resposta);
+  
+  // Encontrar e atualizar a dúvida na lista
+  const duvidaIndex = duvidasMemoria.findIndex(d => d.id === parseInt(id));
+  
+  if (duvidaIndex !== -1) {
+    duvidasMemoria[duvidaIndex] = {
+      ...duvidasMemoria[duvidaIndex],
+      status: 'respondida',
+      resposta,
+      dataResposta: new Date().toISOString()
+    };
+    
+    console.log('✅ Dúvida atualizada:', duvidasMemoria[duvidaIndex]);
+  } else {
+    console.log('❌ Dúvida não encontrada');
+  }
   
   res.json({
     message: 'Dúvida respondida com sucesso',
