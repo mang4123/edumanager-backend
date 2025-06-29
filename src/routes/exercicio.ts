@@ -62,7 +62,7 @@ router.get('/:id', (req, res) => {
     });
   }
   
-  res.json({
+  return res.json({
     message: 'Detalhes do exercício',
     data: {
       id: parseInt(id),
@@ -456,7 +456,7 @@ router.post('/:id/questoes', (req, res) => {
   
   exercicio.questoes.push(novaQuestao);
   
-  res.status(201).json({
+  return res.status(201).json({
     message: 'Questão adicionada com sucesso',
     data: {
       questao: novaQuestao,
@@ -505,7 +505,7 @@ router.put('/:exercicioId/questoes/:questaoId', (req, res) => {
   if (pontuacao) questao.pontuacao = pontuacao;
   questao.dataModificacao = new Date().toISOString();
   
-  res.json({
+  return res.json({
     message: 'Questão atualizada com sucesso',
     data: {
       questao,
@@ -551,7 +551,7 @@ router.delete('/:exercicioId/questoes/:questaoId', (req, res) => {
     q.numero = index + 1;
   });
   
-  res.json({
+  return res.json({
     message: 'Questão removida com sucesso',
     data: {
       questaoRemovida,
