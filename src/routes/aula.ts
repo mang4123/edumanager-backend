@@ -1,5 +1,6 @@
 import { Router } from 'express';
-import { authenticateToken } from '../middleware/auth';
+import { authenticateToken, requireRole } from '../middleware/auth';
+import { Request, Response } from 'express';
 
 const router = Router();
 
@@ -135,20 +136,30 @@ router.get('/:id', (req, res) => {
 
 // === ROTAS ESPECÍFICAS PARA CALENDÁRIO ===
 // Buscar aulas por data específica
-router.get('/data/:data', (req, res) => {
-  const { data } = req.params;
+router.get('/data/:data', (req: Request, res: Response) => {
   console.log('=== BUSCAR AULAS POR DATA ===');
-  console.log('Data solicitada:', data);
+  const data = req.params.data;
+  const user = (req as any).user;
   
-  // Filtrar aulas pela data (incluindo todas para visualização completa)
-  const aulasDaData = aulasMemoria.filter(aula => aula.data === data);
+  console.log(`Data solicitada: ${data}`);
   
-  console.log('Aulas encontradas para', data, ':', aulasDaData.length);
-  console.log('Dados das aulas:', aulasDaData);
+  // Filtrar aulas baseado no tipo de usuário
+  let aulasEncontradas = aulasMemoria.filter(aula => aula.data === data);
+  
+  // Se for aluno, mostrar apenas suas próprias aulas
+  if (user.tipo === 'aluno') {
+    aulasEncontradas = aulasEncontradas.filter(aula => 
+      aula.aluno.email === user.email || 
+      aula.aluno.id.toString() === user.id.toString()
+    );
+    console.log(`🧑‍🎓 FILTRO ALUNO: ${aulasEncontradas.length} aulas encontradas para o aluno`);
+  }
+  
+  console.log(`Aulas encontradas para ${data} : ${aulasEncontradas.length}`);
   
   res.json({
     message: `Aulas para ${data}`,
-    data: aulasDaData.map(aula => ({
+    data: aulasEncontradas.map(aula => ({
       id: aula.id,
       horario: aula.horario,
       aluno: { 
@@ -162,7 +173,7 @@ router.get('/data/:data', (req, res) => {
       motivo: aula.motivo || null,
       dataCancelamento: aula.dataCancelamento || null
     })),
-    total: aulasDaData.length
+    total: aulasEncontradas.length
   });
 });
 
@@ -253,11 +264,11 @@ router.post('/nova', (req, res) => {
 });
 
 // Agendar aula (rota original melhorada)
-router.post('/', (req, res) => {
+router.post('/', requireRole(['professor']), (req: Request, res: Response) => {
   console.log('=== AGENDAR AULA (ROTA ORIGINAL) ===');
-  console.log('Dados recebidos:', req.body);
+  const { aluno_id, data, horario, materia } = req.body;
   
-  const { aluno_id, data, horario, materia, tipo, observacoes } = req.body;
+  console.log('Dados recebidos:', { aluno_id, data, horario, materia });
   
   // Buscar nome do aluno baseado no ID
   const alunosDisponiveis: Record<number, { nome: string; email: string }> = {
@@ -285,7 +296,7 @@ router.post('/', (req, res) => {
     materia: materia || 'Geral',
     topico: req.body.topico || 'Aula particular',
     status: 'agendada',
-    tipo: tipo || 'presencial',
+    tipo: req.body.tipo || 'presencial',
     valor: req.body.valor || 100.00
   };
   
@@ -301,7 +312,7 @@ router.post('/', (req, res) => {
 });
 
 // Editar aula
-router.put('/:id', (req, res) => {
+router.put('/:id', requireRole(['professor']), (req: Request, res: Response) => {
   const { id } = req.params;
   console.log('=== EDITAR AULA ===');
   console.log('Aula ID:', id);
@@ -377,7 +388,7 @@ router.put('/:id/reagendar', (req, res) => {
 });
 
 // Cancelar aula
-router.delete('/:id', (req, res) => {
+router.delete('/:id', requireRole(['professor']), (req: Request, res: Response) => {
   const { id } = req.params;
   console.log('=== CANCELAR AULA ===');
   console.log('Aula ID:', id);

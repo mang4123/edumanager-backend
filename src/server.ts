@@ -5,7 +5,8 @@ import dotenv from 'dotenv';
 import { errorHandler } from './middleware/errorHandler';
 import { authRoutes } from './routes/auth';
 import { professorRoutes } from './routes/professor';
-import { alunoRoutes } from './routes/aluno';
+import alunoRoutes from './routes/aluno';
+import studentRoutes from './routes/student';
 import { aulaRoutes } from './routes/aula';
 import { exercicioRoutes } from './routes/exercicio';
 import { financeiroRoutes } from './routes/financeiro';
@@ -157,6 +158,7 @@ app.get('/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/professor', professorRoutes);
 app.use('/api/aluno', alunoRoutes);
+app.use('/api/student', studentRoutes);
 app.use('/api/aula', aulaRoutes);
 app.use('/api/exercicio', exercicioRoutes);
 app.use('/api/financeiro', financeiroRoutes);
