@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { authenticateToken, requireRole, AuthRequest } from '../middleware/auth';
+import { supabaseAdmin } from '../config/supabase';
 
 const router = Router();
 
@@ -7,110 +8,367 @@ const router = Router();
 router.use(authenticateToken);
 router.use(requireRole(['professor']));
 
-// Dashboard do professor - dados principais
-router.get('/dashboard', (req, res) => {
-  res.json({ 
-    message: 'Dashboard do professor',
-    data: {
-      totalAlunos: 12,
-      aulasHoje: 3,
-      proximaAula: {
-        id: 1,
-        aluno: 'João Silva',
-        horario: '14:00',
-        materia: 'Matemática'
-      },
-      estatisticas: {
-        aulasRealizadas: 45,
-        exerciciosCorrigidos: 23,
-        receita: 2500.00
-      }
+// Dashboard principal
+router.get('/dashboard', async (req: AuthRequest, res) => {
+    try {
+        const userId = req.user!.id;
+
+        // Buscar estatísticas do professor
+        const { data: alunos } = await supabaseAdmin
+            .from('profiles')
+            .select('*')
+            .eq('professor_id', userId)
+            .eq('tipo', 'aluno');
+
+        const { data: aulas } = await supabaseAdmin
+            .from('aulas')
+            .select('*')
+            .eq('professor_id', userId);
+
+        const { data: exercicios } = await supabaseAdmin
+            .from('exercicios')
+            .select('*')
+            .eq('professor_id', userId);
+
+        const { data: duvidas } = await supabaseAdmin
+            .from('duvidas')
+            .select('*')
+            .eq('professor_id', userId)
+            .eq('status', 'aberta');
+
+        // Próximas aulas (hoje)
+        const hoje = new Date().toISOString().split('T')[0];
+        const { data: proximasAulas } = await supabaseAdmin
+            .from('aulas')
+            .select(`
+                *,
+                aluno:profiles!aulas_aluno_id_fkey(nome, email)
+            `)
+            .eq('professor_id', userId)
+            .gte('data_hora', hoje)
+            .lte('data_hora', hoje + 'T23:59:59')
+            .order('data_hora', { ascending: true });
+
+        // Estatísticas financeiras
+        const { data: financeiro } = await supabaseAdmin
+            .from('financeiro')
+            .select('*')
+            .eq('professor_id', userId);
+
+        const receitaTotal = financeiro?.reduce((total, item) => 
+            item.status === 'pago' ? total + parseFloat(item.valor) : total, 0) || 0;
+        
+        const pendentes = financeiro?.filter(item => item.status === 'pendente').length || 0;
+
+        res.json({
+            success: true,
+            data: {
+                estatisticas: {
+                    totalAlunos: alunos?.length || 0,
+                    totalAulas: aulas?.length || 0,
+                    totalExercicios: exercicios?.length || 0,
+                    duvidasPendentes: duvidas?.length || 0,
+                    receitaTotal,
+                    pagamentosPendentes: pendentes
+                },
+                proximasAulas: proximasAulas || [],
+                duvidasPendentes: duvidas?.slice(0, 5) || []
+            }
+        });
+    } catch (error) {
+        console.error('Erro no dashboard:', error);
+        res.status(500).json({ 
+            success: false, 
+            error: 'Erro interno do servidor' 
+        });
     }
-  });
 });
 
 // Perfil do professor
-router.get('/profile', (req: AuthRequest, res) => {
-  res.json({
-    message: 'Perfil do professor',
-    data: {
-      id: req.user?.id,
-      nome: 'Professor Exemplo',
-      email: req.user?.email,
-      especialidade: 'Matemática',
-      telefone: '(11) 99999-9999',
-      bio: 'Professor experiente em matemática'
+router.get('/profile', async (req: AuthRequest, res) => {
+    try {
+        const userId = req.user!.id;
+        
+        const { data: professor, error } = await supabaseAdmin
+            .from('profiles')
+            .select('*')
+            .eq('id', userId)
+            .eq('tipo', 'professor')
+            .single();
+
+        if (error || !professor) {
+            return res.status(404).json({ 
+                success: false, 
+                error: 'Professor não encontrado' 
+            });
+        }
+
+        res.json({
+            success: true,
+            data: professor
+        });
+    } catch (error) {
+        console.error('Erro ao buscar perfil:', error);
+        res.status(500).json({ 
+            success: false, 
+            error: 'Erro interno do servidor' 
+        });
     }
-  });
 });
 
-// Gerenciar alunos
-router.get('/alunos', (req, res) => {
-  res.json({ 
-    message: 'Lista de alunos',
-    data: [
-      {
-        id: 1,
-        nome: 'João Silva',
-        email: 'joao@email.com',
-        telefone: '(11) 88888-8888',
-        status: 'ativo'
-      },
-      {
-        id: 2,
-        nome: 'Maria Santos',
-        email: 'maria@email.com',
-        telefone: '(11) 77777-7777',
-        status: 'ativo'
-      }
-    ]
-  });
+// Atualizar perfil
+router.put('/profile', async (req: AuthRequest, res) => {
+    try {
+        const userId = req.user!.id;
+        const { nome, telefone, especialidade } = req.body;
+
+        const { data, error } = await supabaseAdmin
+            .from('profiles')
+            .update({ 
+                nome, 
+                telefone, 
+                especialidade,
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', userId)
+            .eq('tipo', 'professor')
+            .select()
+            .single();
+
+        if (error) {
+            return res.status(400).json({ 
+                success: false, 
+                error: 'Erro ao atualizar perfil' 
+            });
+        }
+
+        res.json({
+            success: true,
+            data,
+            message: 'Perfil atualizado com sucesso'
+        });
+    } catch (error) {
+        console.error('Erro ao atualizar perfil:', error);
+        res.status(500).json({ 
+            success: false, 
+            error: 'Erro interno do servidor' 
+        });
+    }
 });
 
-// Rota para compatibilidade com frontend (students = alunos)
-router.get('/students', (req, res) => {
-  res.json({ 
-    message: 'Lista de alunos', 
-    data: [
-      {
-        id: 1,
-        nome: 'João Silva',
-        email: 'joao@email.com',
-        telefone: '(11) 88888-8888',
-        status: 'ativo'
-      },
-      {
-        id: 2,
-        nome: 'Maria Santos',
-        email: 'maria@email.com',
-        telefone: '(11) 77777-7777',
-        status: 'ativo'
-      }
-    ]
-  });
+// Listar alunos
+router.get('/alunos', async (req: AuthRequest, res) => {
+    try {
+        const userId = req.user!.id;
+        
+        const { data: alunos, error } = await supabaseAdmin
+            .from('profiles')
+            .select(`
+                id,
+                nome,
+                email,
+                telefone,
+                created_at,
+                updated_at
+            `)
+            .eq('professor_id', userId)
+            .eq('tipo', 'aluno')
+            .order('created_at', { ascending: false });
+
+        if (error) {
+            return res.status(400).json({ 
+                success: false, 
+                error: 'Erro ao buscar alunos' 
+            });
+        }
+
+        res.json({
+            success: true,
+            data: alunos || []
+        });
+    } catch (error) {
+        console.error('Erro ao buscar alunos:', error);
+        res.status(500).json({ 
+            success: false, 
+            error: 'Erro interno do servidor' 
+        });
+    }
+});
+
+// Alias para alunos (compatibilidade)
+router.get('/students', async (req: AuthRequest, res) => {
+    try {
+        const userId = req.user!.id;
+        
+        const { data: alunos, error } = await supabaseAdmin
+            .from('profiles')
+            .select(`
+                id,
+                nome,
+                email,
+                telefone,
+                created_at,
+                updated_at
+            `)
+            .eq('professor_id', userId)
+            .eq('tipo', 'aluno')
+            .order('created_at', { ascending: false });
+
+        if (error) {
+            return res.status(400).json({ 
+                success: false, 
+                error: 'Erro ao buscar alunos' 
+            });
+        }
+
+        res.json({
+            success: true,
+            data: alunos || []
+        });
+    } catch (error) {
+        console.error('Erro ao buscar alunos:', error);
+        res.status(500).json({ 
+            success: false, 
+            error: 'Erro interno do servidor' 
+        });
+    }
 });
 
 // Detalhes de um aluno específico
-router.get('/alunos/:id', (req: AuthRequest, res) => {
-  const { id } = req.params;
-  
-  res.json({
-    message: 'Detalhes do aluno',
-    data: {
-      id: parseInt(id),
-      nome: 'João Silva',
-      email: 'joao@email.com',
-      telefone: '(11) 99999-9999',
-      idade: 16,
-      serie: '1º ano',
-      materias: ['Matemática', 'Física'],
-      notaMedia: 8.5,
-      ultimaAula: '2024-01-15',
-      proximaAula: '2024-01-22',
-      situacao: 'em dia',
-      observacoes: 'Aluno dedicado, precisa melhorar em física.'
+router.get('/alunos/:id', async (req: AuthRequest, res) => {
+    try {
+        const userId = req.user!.id;
+        const alunoId = req.params.id;
+
+        const { data: aluno, error } = await supabaseAdmin
+            .from('profiles')
+            .select('*')
+            .eq('id', alunoId)
+            .eq('professor_id', userId)
+            .eq('tipo', 'aluno')
+            .single();
+
+        if (error || !aluno) {
+            return res.status(404).json({ 
+                success: false, 
+                error: 'Aluno não encontrado' 
+            });
+        }
+
+        // Buscar dados adicionais do aluno
+        const { data: aulas } = await supabaseAdmin
+            .from('aulas')
+            .select('*')
+            .eq('aluno_id', alunoId)
+            .eq('professor_id', userId);
+
+        const { data: exercicios } = await supabaseAdmin
+            .from('exercicio_alunos')
+            .select(`
+                *,
+                exercicio:exercicios(titulo, materia)
+            `)
+            .eq('aluno_id', alunoId);
+
+        const { data: financeiro } = await supabaseAdmin
+            .from('financeiro')
+            .select('*')
+            .eq('aluno_id', alunoId)
+            .eq('professor_id', userId);
+
+        res.json({
+            success: true,
+            data: {
+                ...aluno,
+                estatisticas: {
+                    totalAulas: aulas?.length || 0,
+                    totalExercicios: exercicios?.length || 0,
+                    exerciciosPendentes: exercicios?.filter(e => e.status === 'pendente').length || 0,
+                    pagamentosPendentes: financeiro?.filter(f => f.status === 'pendente').length || 0
+                },
+                aulas: aulas || [],
+                exercicios: exercicios || [],
+                financeiro: financeiro || []
+            }
+        });
+    } catch (error) {
+        console.error('Erro ao buscar detalhes do aluno:', error);
+        res.status(500).json({ 
+            success: false, 
+            error: 'Erro interno do servidor' 
+        });
     }
-  });
+});
+
+// Gerar token de convite para aluno
+router.post('/alunos/gerar-token', async (req: AuthRequest, res) => {
+    try {
+        const userId = req.user!.id;
+        
+        // Gerar token simples de 6 caracteres
+        const token = Math.random().toString(36).substring(2, 8).toUpperCase();
+        
+        // Salvar o token temporariamente (você pode criar uma tabela específica para isso)
+        const { data, error } = await supabaseAdmin
+            .from('profiles')
+            .update({ convite_token: token })
+            .eq('id', userId)
+            .eq('tipo', 'professor')
+            .select()
+            .single();
+
+        if (error) {
+            return res.status(400).json({ 
+                success: false, 
+                error: 'Erro ao gerar token' 
+            });
+        }
+
+        res.json({
+            success: true,
+            data: { token },
+            message: `Token gerado: ${token}. Compartilhe com seu aluno.`
+        });
+    } catch (error) {
+        console.error('Erro ao gerar token:', error);
+        res.status(500).json({ 
+            success: false, 
+            error: 'Erro interno do servidor' 
+        });
+    }
+});
+
+// Remover aluno
+router.delete('/alunos/:id', async (req: AuthRequest, res) => {
+    try {
+        const userId = req.user!.id;
+        const alunoId = req.params.id;
+
+        const { error } = await supabaseAdmin
+            .from('profiles')
+            .delete()
+            .eq('id', alunoId)
+            .eq('professor_id', userId)
+            .eq('tipo', 'aluno');
+
+        if (error) {
+            return res.status(400).json({ 
+                success: false, 
+                error: 'Erro ao remover aluno' 
+            });
+        }
+
+        res.json({
+            success: true,
+            message: 'Aluno removido com sucesso'
+        });
+    } catch (error) {
+        console.error('Erro ao remover aluno:', error);
+        res.status(500).json({ 
+            success: false, 
+            error: 'Erro interno do servidor' 
+        });
+    }
 });
 
 // === SISTEMA DE TOKEN SIMPLES PARA CONVITES ===
