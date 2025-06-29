@@ -214,62 +214,116 @@ export class AuthController {
 
   // Login
   async login(req: Request, res: Response, next: NextFunction) {
+    // Timeout de 10 segundos para evitar travamento
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Login timeout - operação demorou mais de 10s')), 10000);
+    });
+
+    try {
+      await Promise.race([
+        this.performLogin(req, res, next),
+        timeoutPromise
+      ]);
+    } catch (error) {
+      console.error('💥 ERRO OU TIMEOUT NO LOGIN:', error);
+      next(error);
+    }
+  }
+
+  // Método separado para realizar o login
+  private async performLogin(req: Request, res: Response, next: NextFunction) {
+    const startTime = Date.now();
     try {
       const { email, password } = req.body;
 
-      console.log('=== LOGIN (SEM SUPABASE AUTH) ===');
-      console.log('Email:', email);
+      console.log('🔥 === INÍCIO LOGIN === 🔥');
+      console.log('📧 Email:', email);
+      console.log('⏰ Tempo:', new Date().toISOString());
 
       if (!email || !password) {
+        console.log('❌ Email ou senha faltando');
         throw createError('Email e senha são obrigatórios', 400);
       }
 
+      console.log('📊 1/5 - Validação OK, buscando usuário...');
+      
       // Buscar usuário na tabela profiles
-      const { data: profile, error: profileError } = await supabaseAdmin
-        .from('profiles')
-        .select('*')
-        .eq('email', email)
-        .single();
+      try {
+        const { data: profile, error: profileError } = await supabaseAdmin
+          .from('profiles')
+          .select('*')
+          .eq('email', email)
+          .single();
 
-      if (profileError || !profile) {
-        console.log('Usuário não encontrado:', email);
-        throw createError('Credenciais inválidas', 401);
+        console.log('📊 2/5 - Consulta Supabase concluída');
+        console.log('👤 Profile encontrado:', !!profile);
+        console.log('❌ Profile error:', profileError?.message || 'nenhum');
+
+        if (profileError || !profile) {
+          console.log('❌ Usuário não encontrado:', email);
+          throw createError('Credenciais inválidas', 401);
+        }
+
+        console.log('📊 3/5 - Usuário encontrado, verificando senha...');
+
+        // Verificar senha
+        const isPasswordValid = await bcrypt.compare(password, profile.password_hash);
+        
+        console.log('📊 4/5 - Verificação de senha concluída');
+        console.log('🔐 Senha válida:', isPasswordValid);
+
+        if (!isPasswordValid) {
+          console.log('❌ Senha incorreta para:', email);
+          throw createError('Credenciais inválidas', 401);
+        }
+
+        console.log('📊 5/5 - Gerando token JWT...');
+
+        // Gerar JWT token
+        const token = jwt.sign(
+          { 
+            userId: profile.id, 
+            email: profile.email, 
+            tipo: profile.tipo 
+          },
+          process.env.JWT_SECRET || 'fallback-secret',
+          { expiresIn: '24h' }
+        );
+
+        console.log('✅ Token gerado com sucesso');
+
+        // Remover password_hash da resposta e adicionar role
+        const { password_hash, ...userProfile } = profile;
+
+        const response = {
+          message: 'Login realizado com sucesso',
+          user: {
+            ...userProfile,
+            role: profile.tipo // Adicionar campo role para compatibilidade com frontend
+          },
+          access_token: token,
+          token: token, // Adicionar token com nome alternativo para compatibilidade
+          auth_token: token // Adicionar auth_token para compatibilidade com Lovable
+        };
+
+        const elapsed = Date.now() - startTime;
+        console.log('🎉 === LOGIN CONCLUÍDO === 🎉');
+        console.log('⏱️  Tempo total:', elapsed + 'ms');
+        console.log('📤 Enviando resposta...');
+
+        res.json(response);
+        
+      } catch (dbError) {
+        console.error('💥 ERRO NA CONSULTA SUPABASE:', dbError);
+        throw createError('Erro interno do servidor', 500);
       }
-
-      // Verificar senha
-      const isPasswordValid = await bcrypt.compare(password, profile.password_hash);
-
-      if (!isPasswordValid) {
-        console.log('Senha incorreta para:', email);
-        throw createError('Credenciais inválidas', 401);
-      }
-
-      // Gerar JWT token
-      const token = jwt.sign(
-        { 
-          userId: profile.id, 
-          email: profile.email, 
-          tipo: profile.tipo 
-        },
-        process.env.JWT_SECRET || 'fallback-secret',
-        { expiresIn: '24h' }
-      );
-
-      // Remover password_hash da resposta e adicionar role
-      const { password_hash, ...userProfile } = profile;
-
-      res.json({
-        message: 'Login realizado com sucesso',
-        user: {
-          ...userProfile,
-          role: profile.tipo // Adicionar campo role para compatibilidade com frontend
-        },
-        access_token: token,
-        token: token, // Adicionar token com nome alternativo para compatibilidade
-        auth_token: token // Adicionar auth_token para compatibilidade com Lovable
-      });
+      
     } catch (error) {
-      next(error);
+      const elapsed = Date.now() - startTime;
+      console.error('💥 === ERRO NO LOGIN === 💥');
+      console.error('⏱️  Tempo até erro:', elapsed + 'ms');
+      console.error('❌ Erro:', error);
+      throw error; // Re-throw para ser capturado pelo método principal
     }
   }
 
