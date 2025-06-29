@@ -113,13 +113,13 @@ router.get('/alunos/:id', (req: AuthRequest, res) => {
   });
 });
 
-// === SISTEMA DE CONVITE POR LINK EXCLUSIVO ===
-// Gerar link de convite para aluno - FUNCIONAL E MELHORADO
-router.post('/alunos/convite', (req: any, res) => {
+// === SISTEMA DE TOKEN SIMPLES PARA CONVITES ===
+// Gerar token simples para novo aluno
+router.post('/alunos/gerar-token', (req: any, res) => {
   const { nome, email, telefone } = req.body;
   const professorId = req.user?.id;
   
-  console.log('=== GERAR CONVITE - DADOS RECEBIDOS ===');
+  console.log('=== GERAR TOKEN SIMPLES ===');
   console.log('Nome:', nome);
   console.log('Email:', email);
   console.log('Telefone:', telefone);
@@ -128,155 +128,167 @@ router.post('/alunos/convite', (req: any, res) => {
   if (!nome || !email) {
     return res.status(400).json({
       success: false,
-      message: 'Nome e email são obrigatórios para gerar o convite',
+      message: 'Nome e email são obrigatórios',
       error: 'DADOS_INCOMPLETOS'
     });
   }
   
   try {
-    // Gerar token único para o convite
-    const conviteToken = Buffer.from(`${professorId}-${email}-${Date.now()}`).toString('base64');
-    const linkConvite = `https://preview--tutor-class-organize.lovable.app/aluno/cadastro?convite=${conviteToken}&professor=${professorId}`;
+    // Gerar token simples de 8 caracteres
+    const tokenSimples = Math.random().toString(36).substr(2, 8).toUpperCase();
     
-    // Criar o convite no estado global
+    // Criar convite no estado global
     const convite = {
-      id: conviteToken,
+      id: tokenSimples,
+      token: tokenSimples,
       professorId: professorId || 'professor-default',
       nomeAluno: nome,
       emailAluno: email,
       telefoneAluno: telefone || '',
-      token: conviteToken,
-      linkConvite,
       dataGeracao: new Date().toISOString(),
       validoAte: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 dias
-      usado: false
+      usado: false,
+      tipo: 'token_simples'
     };
     
     req.estadoGlobal.convitesGerados.push(convite);
     
-    // Enviar email de convite (simulado)
-    req.estadoGlobal.enviarNotificacaoEmail(
-      email,
-      'Convite para ser aluno - EduManager',
-      `Olá ${nome}! Você foi convidado(a) para ser aluno. Clique no link para se cadastrar: ${linkConvite}`
-    );
-    
-    // Enviar SMS se telefone fornecido (simulado)
-    if (telefone) {
-      req.estadoGlobal.enviarNotificacaoSMS(
-        telefone,
-        `Convite EduManager: Você foi convidado(a) para ser aluno. Link: ${linkConvite}`
-      );
-    }
-    
-    console.log('✅ CONVITE GERADO COM SUCESSO');
-    console.log('Token:', conviteToken);
-    console.log('Link:', linkConvite);
+    console.log('✅ TOKEN GERADO COM SUCESSO:', tokenSimples);
     
     return res.status(201).json({
       success: true,
-      message: 'Convite gerado e enviado com sucesso!',
+      message: 'Token gerado com sucesso!',
       data: {
-        convite: {
-          id: conviteToken,
-          token: conviteToken,
-          linkConvite,
-          nomeAluno: nome,
-          emailAluno: email,
-          telefoneAluno: telefone,
-          professorId: professorId,
-          validoAte: convite.validoAte,
-          dataGeracao: convite.dataGeracao,
-          usado: false
+        token: tokenSimples,
+        aluno: {
+          nome,
+          email,
+          telefone
         },
-        envio: {
-          email: true,
-          sms: !!telefone,
-          statusEmail: 'enviado',
-          statusSms: telefone ? 'enviado' : 'nao_solicitado'
+        validade: {
+          dias: 7,
+          dataLimite: convite.validoAte,
+          dataGeracao: convite.dataGeracao
         },
         instrucoes: {
-          comoUsar: 'O convite foi enviado por email/SMS. O aluno pode usar o link para se cadastrar automaticamente.',
-          validadeDias: 7,
-          linkDireto: linkConvite
+          paraAluno: `Use o token ${tokenSimples} ao se cadastrar no sistema`,
+          comoUsar: 'O aluno deve inserir este token no campo "Token de Convite" durante o cadastro'
         },
         estatisticas: {
-          totalConvitesGerados: req.estadoGlobal.convitesGerados.length,
-          convitesAtivos: req.estadoGlobal.convitesGerados.filter((c: any) => !c.usado && new Date(c.validoAte) > new Date()).length
+          totalTokens: req.estadoGlobal.convitesGerados.length,
+          tokensAtivos: req.estadoGlobal.convitesGerados.filter((c: any) => !c.usado && new Date(c.validoAte) > new Date()).length
         }
       }
     });
     
   } catch (error) {
-    console.error('❌ ERRO ao gerar convite:', error);
+    console.error('❌ ERRO ao gerar token:', error);
     return res.status(500).json({
       success: false,
-      message: 'Erro interno ao gerar convite',
+      message: 'Erro interno ao gerar token',
       error: 'ERRO_INTERNO'
     });
   }
 });
 
-// Listar convites gerados pelo professor
-router.get('/convites', (req: any, res) => {
+// Validar token simples
+router.get('/tokens/:token/validar', (req: any, res) => {
+  const { token } = req.params;
+  
+  console.log('=== VALIDAR TOKEN ===');
+  console.log('Token:', token);
+  
+  try {
+    // Buscar token no estado global
+    const convite = req.estadoGlobal?.convitesGerados?.find(
+      (c: any) => c.token === token.toUpperCase()
+    );
+    
+    if (!convite) {
+      return res.status(404).json({
+        valido: false,
+        motivo: 'Token não encontrado no sistema'
+      });
+    }
+    
+    // Verificar se não expirou
+    const agora = new Date();
+    const validoAte = new Date(convite.validoAte);
+    
+    if (agora > validoAte) {
+      return res.status(400).json({
+        valido: false,
+        motivo: 'Token expirado',
+        dataExpiracao: convite.validoAte
+      });
+    }
+    
+    // Verificar se já foi usado
+    if (convite.usado) {
+      return res.status(400).json({
+        valido: false,
+        motivo: 'Este token já foi utilizado'
+      });
+    }
+    
+    console.log('✅ Token válido:', token);
+    
+    return res.json({
+      valido: true,
+      dadosAluno: {
+        nome: convite.nomeAluno,
+        email: convite.emailAluno,
+        telefone: convite.telefoneAluno
+      },
+      professor: {
+        id: convite.professorId
+      },
+      dataGeracao: convite.dataGeracao,
+      validoAte: convite.validoAte,
+      diasRestantes: Math.ceil((validoAte.getTime() - agora.getTime()) / (1000 * 60 * 60 * 24))
+    });
+    
+  } catch (error) {
+    console.error('❌ ERRO ao validar token:', error);
+    return res.status(500).json({
+      valido: false,
+      motivo: 'Erro interno do servidor'
+    });
+  }
+});
+
+// Listar tokens gerados pelo professor
+router.get('/tokens', (req: any, res) => {
   const professorId = req.user?.id;
   
-  // Filtrar convites do professor atual
-  const convitesProfessor = req.estadoGlobal.convitesGerados.filter(
+  // Filtrar tokens do professor atual
+  const tokensProfessor = req.estadoGlobal.convitesGerados.filter(
     (convite: any) => convite.professorId === professorId
   );
   
   return res.json({
-    message: 'Convites gerados',
+    message: 'Tokens gerados',
     data: {
-      convites: convitesProfessor,
+      tokens: tokensProfessor.map((c: any) => ({
+        token: c.token,
+        aluno: {
+          nome: c.nomeAluno,
+          email: c.emailAluno,
+          telefone: c.telefoneAluno
+        },
+        status: c.usado ? 'usado' : (new Date(c.validoAte) > new Date() ? 'ativo' : 'expirado'),
+        dataGeracao: c.dataGeracao,
+        validoAte: c.validoAte,
+        usado: c.usado
+      })),
       estatisticas: {
-        total: convitesProfessor.length,
-        usados: convitesProfessor.filter((c: any) => c.usado).length,
-        ativos: convitesProfessor.filter((c: any) => !c.usado && new Date(c.validoAte) > new Date()).length,
-        expirados: convitesProfessor.filter((c: any) => !c.usado && new Date(c.validoAte) <= new Date()).length
+        total: tokensProfessor.length,
+        usados: tokensProfessor.filter((c: any) => c.usado).length,
+        ativos: tokensProfessor.filter((c: any) => !c.usado && new Date(c.validoAte) > new Date()).length,
+        expirados: tokensProfessor.filter((c: any) => !c.usado && new Date(c.validoAte) <= new Date()).length
       }
     }
   });
-});
-
-// Validar convite
-router.get('/convites/:token/validar', (req: AuthRequest, res) => {
-  const { token } = req.params;
-  
-  try {
-    // Decodificar token (simplificado para demonstração)
-    const decoded = Buffer.from(token, 'base64').toString('utf-8');
-    const [professorId, email, timestamp] = decoded.split('-');
-    
-    // Verificar se o convite não expirou (7 dias)
-    const dataGeracao = new Date(parseInt(timestamp));
-    const agora = new Date();
-    const diffDias = (agora.getTime() - dataGeracao.getTime()) / (1000 * 60 * 60 * 24);
-    
-    if (diffDias > 7) {
-      return res.status(400).json({
-        message: 'Convite expirado',
-        data: { valido: false, motivo: 'Convite válido por apenas 7 dias' }
-      });
-    }
-    
-    return res.json({
-      message: 'Convite válido',
-      data: {
-        valido: true,
-        professorId,
-        emailConvidado: email,
-        diasRestantes: Math.ceil(7 - diffDias)
-      }
-    });
-    
-  } catch (error) {
-    return res.status(400).json({
-      message: 'Token de convite inválido',
-      data: { valido: false, motivo: 'Token malformado ou inválido' }
-    });
-  }
 });
 
 // === ÁREA DE GRAVAÇÃO PREMIUM (BLOQUEADA) ===
@@ -813,16 +825,23 @@ router.get('/duvidas', (req: any, res) => {
   });
 });
 
-// Responder uma dúvida específica - BIDIRECIONAL
+// Responder uma dúvida específica - BIDIRECIONAL - CORRIGIDO
 router.post('/duvidas/:id/responder', (req: any, res) => {
   const { id } = req.params;
   const { resposta } = req.body;
   const professorId = req.user?.id;
   
-  // Encontrar e atualizar a dúvida no sistema global
-  const duvidaIndex = req.estadoGlobal.duvidasSistema.findIndex((d: any) => d.id === parseInt(id));
+  console.log('=== RESPONDER DÚVIDA (BIDIRECIONAL) ===');
+  console.log('Dúvida ID:', id);
+  console.log('Professor ID:', professorId);
+  console.log('Resposta:', resposta);
+  
+  // Encontrar e atualizar a dúvida no sistema global - CORRIGIDO para comparar com string
+  const duvidaIndex = req.estadoGlobal.duvidasSistema.findIndex((d: any) => d.id.toString() === id.toString());
   
   if (duvidaIndex !== -1) {
+    console.log('✅ Dúvida encontrada no sistema global');
+    
     req.estadoGlobal.duvidasSistema[duvidaIndex] = {
       ...req.estadoGlobal.duvidasSistema[duvidaIndex],
       status: 'respondida',
@@ -842,7 +861,7 @@ router.post('/duvidas/:id/responder', (req: any, res) => {
       {
         tipo: 'modal',
         dados: {
-          duvidaId: parseInt(id),
+          duvidaId: id,
           pergunta: duvidaAtualizada.pergunta,
           resposta: resposta
         }
@@ -851,34 +870,67 @@ router.post('/duvidas/:id/responder', (req: any, res) => {
     
     // Enviar email para o aluno (simulado)
     req.estadoGlobal.enviarNotificacaoEmail(
-      'aluno@email.com',
+      duvidaAtualizada.alunoId.includes('@') ? duvidaAtualizada.alunoId : 'aluno@email.com',
       'Sua dúvida foi respondida - EduManager',
       `Olá! O professor respondeu sua pergunta sobre ${duvidaAtualizada.materia}:\n\nPergunta: ${duvidaAtualizada.pergunta}\nResposta: ${resposta}`
     );
     
+    console.log('✅ Dúvida respondida com sucesso');
+    
+    return res.json({
+      message: 'Dúvida respondida com sucesso',
+      data: {
+        duvidaId: id,
+        resposta,
+        dataResposta: new Date().toISOString(),
+        status: 'respondida',
+        notificacaoEnviada: true,
+        duvidaAtualizada
+      }
+    });
+    
   } else {
-    // Fallback para dúvidas locais
-    const duvidaLocalIndex = duvidasMemoria.findIndex(d => d.id === parseInt(id));
+    console.log('❌ Dúvida não encontrada no sistema global, tentando dúvidas locais');
+    
+    // Fallback para dúvidas locais - CORRIGIDO
+    const duvidaLocalIndex = duvidasMemoria.findIndex(d => d.id.toString() === id.toString());
     if (duvidaLocalIndex !== -1) {
+      console.log('✅ Dúvida encontrada nas dúvidas locais');
+      
       duvidasMemoria[duvidaLocalIndex] = {
         ...duvidasMemoria[duvidaLocalIndex],
         status: 'respondida',
         resposta,
         dataResposta: new Date().toISOString()
       };
+      
+      return res.json({
+        message: 'Dúvida respondida com sucesso',
+        data: {
+          duvidaId: id,
+          resposta,
+          dataResposta: new Date().toISOString(),
+          status: 'respondida',
+          notificacaoEnviada: false,
+          fonte: 'local'
+        }
+      });
+    } else {
+      console.log('❌ Dúvida não encontrada em lugar nenhum');
+      
+      return res.status(404).json({
+        message: 'Dúvida não encontrada',
+        error: 'DUVIDA_NAO_ENCONTRADA',
+        debug: {
+          idProcurado: id,
+          totalDuvidasSistema: req.estadoGlobal.duvidasSistema.length,
+          totalDuvidasLocais: duvidasMemoria.length,
+          duvidasSistemaIds: req.estadoGlobal.duvidasSistema.map((d: any) => d.id),
+          duvidasLocaisIds: duvidasMemoria.map(d => d.id)
+        }
+      });
     }
   }
-  
-  return res.json({
-    message: 'Dúvida respondida com sucesso',
-    data: {
-      duvidaId: parseInt(id),
-      resposta,
-      dataResposta: new Date().toISOString(),
-      status: 'respondida',
-      notificacaoEnviada: true
-    }
-  });
 });
 
 // Marcar dúvida como resolvida

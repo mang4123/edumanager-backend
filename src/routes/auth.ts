@@ -21,21 +21,24 @@ router.post('/forgot-password', (req, res, next) => authController.forgotPasswor
 router.post('/reset-password', (req, res, next) => authController.resetPassword(req, res, next));
 router.get('/profile', (req, res, next) => authController.getProfile(req, res, next));
 
-// === SISTEMA DE CONVITES ===
-// Validar token de convite
-router.get('/convite/:token/validar', (req: any, res) => {
+// === SISTEMA DE TOKENS SIMPLES ===
+// Validar token simples
+router.get('/token/:token/validar', (req: any, res) => {
   const { token } = req.params;
   
+  console.log('=== VALIDAR TOKEN (AUTH) ===');
+  console.log('Token:', token);
+  
   try {
-    // Buscar convite no estado global
+    // Buscar token no estado global
     const convite = req.estadoGlobal?.convitesGerados?.find(
-      (c: any) => c.token === token || c.id === token
+      (c: any) => c.token === token.toUpperCase()
     );
     
     if (!convite) {
       return res.status(404).json({
         valido: false,
-        motivo: 'Convite não encontrado no sistema'
+        motivo: 'Token não encontrado no sistema'
       });
     }
     
@@ -46,7 +49,7 @@ router.get('/convite/:token/validar', (req: any, res) => {
     if (agora > validoAte) {
       return res.status(400).json({
         valido: false,
-        motivo: 'Convite expirado',
+        motivo: 'Token expirado',
         dataExpiracao: convite.validoAte
       });
     }
@@ -55,7 +58,7 @@ router.get('/convite/:token/validar', (req: any, res) => {
     if (convite.usado) {
       return res.status(400).json({
         valido: false,
-        motivo: 'Este convite já foi utilizado'
+        motivo: 'Este token já foi utilizado'
       });
     }
     
@@ -82,25 +85,28 @@ router.get('/convite/:token/validar', (req: any, res) => {
   }
 });
 
-// Registro de aluno via convite
-router.post('/register/aluno/convite', (req: any, res, next) => {
-  const { conviteToken, password, confirmPassword } = req.body;
+// Registro de aluno via token simples
+router.post('/register/aluno/token', (req: any, res, next) => {
+  const { token, password, confirmPassword } = req.body;
+  
+  console.log('=== REGISTRO VIA TOKEN ===');
+  console.log('Token:', token);
   
   try {
-    // Buscar e validar convite
+    // Buscar e validar token
     const convite = req.estadoGlobal?.convitesGerados?.find(
-      (c: any) => c.token === conviteToken || c.id === conviteToken
+      (c: any) => c.token === token.toUpperCase()
     );
     
     if (!convite) {
       return res.status(404).json({
-        message: 'Convite não encontrado'
+        message: 'Token não encontrado'
       });
     }
     
     if (convite.usado) {
       return res.status(400).json({
-        message: 'Este convite já foi utilizado'
+        message: 'Este token já foi utilizado'
       });
     }
     
@@ -109,7 +115,7 @@ router.post('/register/aluno/convite', (req: any, res, next) => {
     
     if (agora > validoAte) {
       return res.status(400).json({
-        message: 'Convite expirado'
+        message: 'Token expirado'
       });
     }
     
@@ -126,17 +132,20 @@ router.post('/register/aluno/convite', (req: any, res, next) => {
       telefone: convite.telefoneAluno,
       password: password,
       professor_id: convite.professorId,
-      viaConvite: true
+      viaToken: true
     };
     
-    // Marcar convite como usado
+    // Marcar token como usado
     convite.usado = true;
     convite.dataUso = new Date().toISOString();
+    
+    console.log('✅ Token validado, registrando aluno');
     
     // Chamar controller de registro de aluno
     return authController.registerAluno(req, res, next);
     
   } catch (error) {
+    console.error('❌ ERRO no registro via token:', error);
     return res.status(500).json({
       message: 'Erro interno do servidor'
     });

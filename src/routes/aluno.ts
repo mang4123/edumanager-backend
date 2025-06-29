@@ -147,7 +147,7 @@ router.get('/profile', (req, res) => {
       exerciciosPendentes: 3,
       materiaisDisponiveis: 2,
       proximaAula: {
-        data: "2024-01-15",
+        data: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
         horario: "15:00",
         materia: "Matemática"
       }
@@ -167,7 +167,7 @@ router.get('/aulas', (req, res) => {
   const aulas = [
     {
       id: 1,
-      data: "2024-01-15",
+      data: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       horario: "15:00",
       materia: "Matemática",
       professor: "Professor Exemplo",
@@ -177,7 +177,7 @@ router.get('/aulas', (req, res) => {
     },
     {
       id: 2,
-      data: "2024-01-12",
+      data: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       horario: "14:00",
       materia: "Português",
       professor: "Professor Exemplo",
@@ -217,7 +217,7 @@ router.get('/materiais', (req: any, res) => {
     tipo: 'exercicio',
     materia: exercicio.materia,
     professor: 'Professor Exemplo',
-    dataEnvio: exercicio.dataEnvio.split('T')[0],
+    dataEnvio: exercicio.dataEnvio ? exercicio.dataEnvio.split('T')[0] : new Date().toISOString().split('T')[0],
     prazo: exercicio.prazo,
     status: 'pendente',
     arquivo: `${exercicio.titulo.toLowerCase().replace(/\s+/g, '_')}.pdf`,
@@ -380,42 +380,173 @@ router.post('/duvidas', (req: any, res) => {
   });
 });
 
-// GET /api/aluno/pagamentos - Informações de pagamento
+// GET /api/aluno/pagamentos - Área de pagamentos COMPLETA
 router.get('/pagamentos', (req, res) => {
   console.log('=== PAGAMENTOS DO ALUNO ===');
   
-  res.json({
-    message: "Informações de pagamento",
-    data: pagamentosAluno
+  return res.json({
+    message: "Área de pagamentos",
+    data: {
+      proximoPagamento: pagamentosAluno.proximoPagamento,
+      historico: pagamentosAluno.historico,
+      resumo: {
+        totalPago: pagamentosAluno.historico
+          .filter(p => p.status === 'pago')
+          .reduce((total, p) => total + p.valor, 0),
+        totalPendente: pagamentosAluno.historico
+          .filter(p => p.status === 'atrasado')
+          .reduce((total, p) => total + p.valor, 0),
+        proximoVencimento: pagamentosAluno.proximoPagamento.vencimento,
+        diasAteVencimento: Math.ceil(
+          (new Date(pagamentosAluno.proximoPagamento.vencimento).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
+        )
+      },
+      // BOTÕES E AÇÕES DE PAGAMENTO
+      acoesPagamento: {
+        pagarOnline: {
+          disponivel: true,
+          url: '/api/aluno/pagamentos/pagar-online',
+          metodos: ['pix', 'cartao', 'boleto']
+        },
+        gerarBoleto: {
+          disponivel: true,
+          url: '/api/aluno/pagamentos/gerar-boleto'
+        },
+        pagarPIX: {
+          disponivel: true,
+          url: '/api/aluno/pagamentos/pagar-pix'
+        },
+        consultarParcelas: {
+          disponivel: true,
+          url: '/api/aluno/pagamentos/parcelar'
+        },
+        negociarDivida: {
+          disponivel: true,
+          url: '/api/aluno/pagamentos/negociar'
+        }
+      },
+      // CONFIGURAÇÕES DE PAGAMENTO
+      configuracoesPagamento: {
+        lembretesPorEmail: true,
+        lembretesAntesDia: 3,
+        debiteAutomatico: false,
+        metodoPreferia: 'pix'
+      }
+    }
   });
 });
 
-// POST /api/aluno/pagamentos/pagar - Processar pagamento
-router.post('/pagamentos/pagar', (req, res) => {
-  console.log('=== PROCESSAR PAGAMENTO ===');
-  const { valor, metodo = 'cartao' } = req.body;
+// POST /api/aluno/pagamentos/pagar-pix - Gerar PIX para pagamento
+router.post('/pagamentos/pagar-pix', (req, res) => {
+  const { valor, descricao } = req.body;
   
-  if (!valor) {
-    return res.status(400).json({
-      error: "Valor é obrigatório"
-    });
-  }
+  console.log('=== GERAR PIX PARA PAGAMENTO ===');
+  console.log('Valor:', valor);
+  console.log('Descrição:', descricao);
+  
+  const pixId = Math.random().toString(36).substr(2, 10).toUpperCase();
+  
+  res.json({
+    message: 'PIX gerado com sucesso',
+    data: {
+      pixId,
+      valor: valor || pagamentosAluno.proximoPagamento.valor,
+      descricao: descricao || pagamentosAluno.proximoPagamento.descricao,
+      chavePixProfessor: 'professor@email.com',
+      qrCode: `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=pix://professor@email.com/${valor || pagamentosAluno.proximoPagamento.valor}`,
+      codigoPix: `00020126580014BR.GOV.BCB.PIX013610e4c7e2-b4a2-4b8e-9f24-8c19b2e5f6d652040000530398654${valor || pagamentosAluno.proximoPagamento.valor}5802BR5925Professor EduManager6009SAO PAULO62070503***6304`,
+      validoAte: new Date(Date.now() + 30 * 60 * 1000).toISOString(), // 30 minutos
+      statusPagamento: 'aguardando',
+      instrucoes: [
+        'Abra seu app do banco',
+        'Vá em PIX',
+        'Escaneie o QR Code ou copie o código',
+        'Confirme o pagamento'
+      ]
+    }
+  });
+});
 
-  // Simular processamento de pagamento
-  const pagamento = {
-    id: Date.now(),
-    valor,
-    metodo,
-    status: "processando",
-    data: new Date().toISOString(),
-    referencia: `PAG${Date.now()}`
-  };
+// POST /api/aluno/pagamentos/gerar-boleto - Gerar boleto para pagamento
+router.post('/pagamentos/gerar-boleto', (req, res) => {
+  const { valor, vencimento } = req.body;
+  
+  console.log('=== GERAR BOLETO ===');
+  
+  const boletoId = Math.random().toString(36).substr(2, 12).toUpperCase();
+  
+  res.json({
+    message: 'Boleto gerado com sucesso',
+    data: {
+      boletoId,
+      codigoBarras: '23790.00129 60007.772020 00012.345671 8 98760000012000',
+      linhaDigitavel: '23790.00129 60007.772020 00012.345671 8 98760000012000',
+      valor: valor || pagamentosAluno.proximoPagamento.valor,
+      vencimento: vencimento || pagamentosAluno.proximoPagamento.vencimento,
+      beneficiario: 'Professor EduManager',
+      pagador: 'Aluno Teste',
+      urlPDF: `/api/aluno/pagamentos/boletos/${boletoId}.pdf`,
+      status: 'pendente',
+      instrucoes: [
+        'Imprima este boleto e pague em qualquer banco',
+        'Ou use o código de barras no internet banking',
+        'Válido até a data de vencimento'
+      ]
+    }
+  });
+});
 
-  console.log('💳 Pagamento processado:', pagamento);
+// POST /api/aluno/pagamentos/parcelar - Consultar opções de parcelamento
+router.post('/pagamentos/parcelar', (req, res) => {
+  const { valor } = req.body;
+  const valorTotal = valor || pagamentosAluno.proximoPagamento.valor;
+  
+  console.log('=== CONSULTAR PARCELAMENTO ===');
+  
+  const opcoesParcelas = [
+    { parcelas: 2, valorParcela: valorTotal / 2, total: valorTotal, juros: 0 },
+    { parcelas: 3, valorParcela: (valorTotal * 1.05) / 3, total: valorTotal * 1.05, juros: 5 },
+    { parcelas: 6, valorParcela: (valorTotal * 1.12) / 6, total: valorTotal * 1.12, juros: 12 },
+    { parcelas: 12, valorParcela: (valorTotal * 1.25) / 12, total: valorTotal * 1.25, juros: 25 }
+  ];
+  
+  res.json({
+    message: 'Opções de parcelamento disponíveis',
+    data: {
+      valorOriginal: valorTotal,
+      opcoes: opcoesParcelas.map(opcao => ({
+        ...opcao,
+        economia: opcao.juros === 0 ? 'Sem juros!' : null,
+        vencimentoPrimeiraParcela: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+      })),
+      observacoes: 'Parcelamento sujeito à aprovação do professor'
+    }
+  });
+});
 
-  return res.json({
-    message: "Pagamento processado com sucesso",
-    data: pagamento
+// POST /api/aluno/pagamentos/confirmar - Confirmar pagamento realizado
+router.post('/pagamentos/confirmar', (req, res) => {
+  const { tipoPagamento, comprovante, valor } = req.body;
+  
+  console.log('=== CONFIRMAR PAGAMENTO ===');
+  console.log('Tipo:', tipoPagamento);
+  console.log('Valor:', valor);
+  
+  res.json({
+    message: 'Pagamento confirmado com sucesso',
+    data: {
+      pagamentoId: Math.random().toString(36).substr(2, 8).toUpperCase(),
+      tipoPagamento,
+      valor: valor || pagamentosAluno.proximoPagamento.valor,
+      dataConfirmacao: new Date().toISOString(),
+      status: 'confirmado_aguardando_validacao',
+      proximosPassos: [
+        'Seu pagamento foi registrado',
+        'Aguarde a confirmação do professor',
+        'Você receberá uma notificação quando aprovado'
+      ],
+      prazoValidacao: '24 horas úteis'
+    }
   });
 });
 
@@ -575,7 +706,7 @@ router.get('/uploads', (req, res) => {
         exercicioId: 1,
         arquivo: 'matematica_lista1.pdf',
         tamanho: '1.5MB',
-        dataUpload: '2024-01-20T14:30:00Z',
+        dataUpload: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
         status: 'corrigido',
         nota: 8.5
       },
@@ -584,7 +715,7 @@ router.get('/uploads', (req, res) => {
         exercicioId: 2,
         arquivo: 'redacao_tema_livre.docx',
         tamanho: '850KB',
-        dataUpload: '2024-01-18T16:45:00Z',
+        dataUpload: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
         status: 'pendente_correcao',
         nota: null
       }
@@ -666,8 +797,8 @@ router.get('/notificacoes', (req: any, res) => {
       id: 2,
       tipo: 'exercicio',
       titulo: 'Prazo de exercício expira em 2 dias',
-      descricao: '24/01/2024, 07:00:00',
-      data: '2024-01-24T10:00:00Z',
+      descricao: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toLocaleDateString('pt-BR') + ', 07:00:00',
+      data: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(),
       lida: false,
       urgencia: 'normal',
       acao: {
@@ -679,8 +810,8 @@ router.get('/notificacoes', (req: any, res) => {
       id: 3,
       tipo: 'nota',
       titulo: 'Nova nota disponível',
-      descricao: '23/01/2024, 13:30:00',
-      data: '2024-01-23T16:30:00Z',
+      descricao: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toLocaleDateString('pt-BR') + ', 13:30:00',
+      data: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
       lida: true,
       urgencia: 'baixa',
       acao: {
