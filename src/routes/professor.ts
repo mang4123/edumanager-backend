@@ -91,132 +91,140 @@ router.get('/students', (req, res) => {
 });
 
 // Detalhes de um aluno específico
-router.get('/alunos/:id', (req, res) => {
+router.get('/alunos/:id', (req: AuthRequest, res) => {
   const { id } = req.params;
-  console.log('=== DETALHES DO ALUNO ===');
-  console.log('Aluno ID:', id);
-  
-  // Dados do aluno baseados no ID
-  const alunos: Record<string, { nome: string; email: string }> = {
-    '1': { nome: 'João Silva', email: 'joao@email.com' },
-    '2': { nome: 'Maria Santos', email: 'maria@email.com' }
-  };
-  
-  const aluno = alunos[id] || { nome: 'Aluno Desconhecido', email: 'aluno@email.com' };
   
   res.json({
     message: 'Detalhes do aluno',
     data: {
       id: parseInt(id),
-      nome: aluno.nome,
-      email: aluno.email,
-      telefone: '(11) 88888-8888',
-      status: 'ativo',
-      aulas: 10,
-      exercicios: 5,
-      proximaAula: {
-        id: 1,
-        data: '2025-07-02',
-        horario: '15:00',
-        materia: 'Matemática',
-        status: 'agendada'
-      },
-      pagamentos: [
-        { data: '2024-01-15', valor: 100, status: 'pago' }
-      ]
+      nome: 'João Silva',
+      email: 'joao@email.com',
+      telefone: '(11) 99999-9999',
+      idade: 16,
+      serie: '1º ano',
+      materias: ['Matemática', 'Física'],
+      notaMedia: 8.5,
+      ultimaAula: '2024-01-15',
+      proximaAula: '2024-01-22',
+      situacao: 'em dia',
+      observacoes: 'Aluno dedicado, precisa melhorar em física.'
     }
   });
 });
 
 // === SISTEMA DE CONVITE POR LINK EXCLUSIVO ===
-// Gerar link de convite para aluno - FUNCIONAL
+// Gerar link de convite para aluno - FUNCIONAL E MELHORADO
 router.post('/alunos/convite', (req: any, res) => {
   const { nome, email, telefone } = req.body;
   const professorId = req.user?.id;
   
-  console.log('=== GERAR CONVITE EXCLUSIVO (FUNCIONAL) ===');
+  console.log('=== GERAR CONVITE - DADOS RECEBIDOS ===');
+  console.log('Nome:', nome);
+  console.log('Email:', email);
+  console.log('Telefone:', telefone);
   console.log('Professor ID:', professorId);
-  console.log('Dados do aluno:', { nome, email, telefone });
   
   if (!nome || !email) {
     return res.status(400).json({
-      message: 'Nome e email são obrigatórios para gerar o convite'
+      success: false,
+      message: 'Nome e email são obrigatórios para gerar o convite',
+      error: 'DADOS_INCOMPLETOS'
     });
   }
   
-  // Gerar token único para o convite
-  const conviteToken = Buffer.from(`${professorId}-${email}-${Date.now()}`).toString('base64');
-  const linkConvite = `https://preview--tutor-class-organize.lovable.app/aluno/cadastro?convite=${conviteToken}&professor=${professorId}`;
-  
-  // Criar o convite no estado global
-  const convite = {
-    id: conviteToken,
-    professorId: professorId || 'professor-default',
-    nomeAluno: nome,
-    emailAluno: email,
-    telefoneAluno: telefone || '',
-    token: conviteToken,
-    linkConvite,
-    dataGeracao: new Date().toISOString(),
-    validoAte: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 dias
-    usado: false
-  };
-  
-  req.estadoGlobal.convitesGerados.push(convite);
-  
-  // Enviar email de convite (simulado)
-  req.estadoGlobal.enviarNotificacaoEmail(
-    email,
-    'Convite para ser aluno - EduManager',
-    `Olá ${nome}! Você foi convidado(a) para ser aluno. Clique no link para se cadastrar: ${linkConvite}`
-  );
-  
-  // Enviar SMS se telefone fornecido (simulado)
-  if (telefone) {
-    req.estadoGlobal.enviarNotificacaoSMS(
-      telefone,
-      `Convite EduManager: Você foi convidado(a) para ser aluno. Link: ${linkConvite}`
-    );
-  }
-  
-  console.log('✅ Convite gerado e salvo!');
-  console.log('📊 Total convites gerados:', req.estadoGlobal.convitesGerados.length);
-  console.log('🔗 Link do convite:', linkConvite);
-  
-  return res.json({
-    message: 'Link de convite gerado com sucesso',
-    data: {
-      conviteToken,
-      linkConvite,
+  try {
+    // Gerar token único para o convite
+    const conviteToken = Buffer.from(`${professorId}-${email}-${Date.now()}`).toString('base64');
+    const linkConvite = `https://preview--tutor-class-organize.lovable.app/aluno/cadastro?convite=${conviteToken}&professor=${professorId}`;
+    
+    // Criar o convite no estado global
+    const convite = {
+      id: conviteToken,
+      professorId: professorId || 'professor-default',
       nomeAluno: nome,
       emailAluno: email,
-      telefoneAluno: telefone,
-      professorId: professorId,
-      validoAte: convite.validoAte,
-      dataGeracao: convite.dataGeracao,
-      enviado: {
-        email: true,
-        sms: !!telefone
-      },
-      instrucoesUso: 'O convite foi enviado por email/SMS. O aluno pode usar o link para se cadastrar automaticamente.',
-      totalConvitesGerados: req.estadoGlobal.convitesGerados.length
+      telefoneAluno: telefone || '',
+      token: conviteToken,
+      linkConvite,
+      dataGeracao: new Date().toISOString(),
+      validoAte: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 dias
+      usado: false
+    };
+    
+    req.estadoGlobal.convitesGerados.push(convite);
+    
+    // Enviar email de convite (simulado)
+    req.estadoGlobal.enviarNotificacaoEmail(
+      email,
+      'Convite para ser aluno - EduManager',
+      `Olá ${nome}! Você foi convidado(a) para ser aluno. Clique no link para se cadastrar: ${linkConvite}`
+    );
+    
+    // Enviar SMS se telefone fornecido (simulado)
+    if (telefone) {
+      req.estadoGlobal.enviarNotificacaoSMS(
+        telefone,
+        `Convite EduManager: Você foi convidado(a) para ser aluno. Link: ${linkConvite}`
+      );
     }
-  });
+    
+    console.log('✅ CONVITE GERADO COM SUCESSO');
+    console.log('Token:', conviteToken);
+    console.log('Link:', linkConvite);
+    
+    return res.status(201).json({
+      success: true,
+      message: 'Convite gerado e enviado com sucesso!',
+      data: {
+        convite: {
+          id: conviteToken,
+          token: conviteToken,
+          linkConvite,
+          nomeAluno: nome,
+          emailAluno: email,
+          telefoneAluno: telefone,
+          professorId: professorId,
+          validoAte: convite.validoAte,
+          dataGeracao: convite.dataGeracao,
+          usado: false
+        },
+        envio: {
+          email: true,
+          sms: !!telefone,
+          statusEmail: 'enviado',
+          statusSms: telefone ? 'enviado' : 'nao_solicitado'
+        },
+        instrucoes: {
+          comoUsar: 'O convite foi enviado por email/SMS. O aluno pode usar o link para se cadastrar automaticamente.',
+          validadeDias: 7,
+          linkDireto: linkConvite
+        },
+        estatisticas: {
+          totalConvitesGerados: req.estadoGlobal.convitesGerados.length,
+          convitesAtivos: req.estadoGlobal.convitesGerados.filter((c: any) => !c.usado && new Date(c.validoAte) > new Date()).length
+        }
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ ERRO ao gerar convite:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Erro interno ao gerar convite',
+      error: 'ERRO_INTERNO'
+    });
+  }
 });
 
 // Listar convites gerados pelo professor
 router.get('/convites', (req: any, res) => {
   const professorId = req.user?.id;
   
-  console.log('=== LISTAR CONVITES GERADOS ===');
-  console.log('Professor ID:', professorId);
-  
   // Filtrar convites do professor atual
   const convitesProfessor = req.estadoGlobal.convitesGerados.filter(
     (convite: any) => convite.professorId === professorId
   );
-  
-  console.log('📊 Convites encontrados:', convitesProfessor.length);
   
   return res.json({
     message: 'Convites gerados',
@@ -235,9 +243,6 @@ router.get('/convites', (req: any, res) => {
 // Validar convite
 router.get('/convites/:token/validar', (req: AuthRequest, res) => {
   const { token } = req.params;
-  
-  console.log('=== VALIDAR CONVITE ===');
-  console.log('Token:', token);
   
   try {
     // Decodificar token (simplificado para demonstração)
@@ -277,8 +282,6 @@ router.get('/convites/:token/validar', (req: AuthRequest, res) => {
 // === ÁREA DE GRAVAÇÃO PREMIUM (BLOQUEADA) ===
 // Acessar gravações (bloqueado)
 router.get('/gravacoes', (req: AuthRequest, res) => {
-  console.log('=== ÁREA DE GRAVAÇÃO (PREMIUM) ===');
-  
   res.json({
     message: 'Área Premium - Gravação de Aulas',
     data: {
@@ -300,8 +303,6 @@ router.get('/gravacoes', (req: AuthRequest, res) => {
 
 // Tentar iniciar gravação (bloqueado)
 router.post('/gravacoes/iniciar', (req: AuthRequest, res) => {
-  console.log('=== TENTATIVA DE GRAVAÇÃO (BLOQUEADA) ===');
-  
   res.status(402).json({
     message: 'Recurso Premium - Upgrade necessário',
     data: {
@@ -325,10 +326,6 @@ router.post('/aulas/:aulaId/comentario', (req: AuthRequest, res) => {
   const { aulaId } = req.params;
   const { comentario, privado = true } = req.body;
   
-  console.log('=== COMENTÁRIO PRIVADO AULA ===');
-  console.log('Aula ID:', aulaId);
-  console.log('Comentário:', comentario);
-  
   res.json({
     message: 'Comentário adicionado com sucesso',
     data: {
@@ -346,9 +343,6 @@ router.post('/aulas/:aulaId/comentario', (req: AuthRequest, res) => {
 // Listar comentários de uma aula
 router.get('/aulas/:aulaId/comentarios', (req: AuthRequest, res) => {
   const { aulaId } = req.params;
-  
-  console.log('=== LISTAR COMENTÁRIOS AULA ===');
-  console.log('Aula ID:', aulaId);
   
   res.json({
     message: 'Comentários da aula',
@@ -374,8 +368,6 @@ router.get('/aulas/:aulaId/comentarios', (req: AuthRequest, res) => {
 // === ÁREAS DE ATUAÇÃO ESPECÍFICAS ===
 // Listar áreas de atuação disponíveis
 router.get('/areas-atuacao', (req: AuthRequest, res) => {
-  console.log('=== ÁREAS DE ATUAÇÃO DISPONÍVEIS ===');
-  
   res.json({
     message: 'Áreas de atuação disponíveis',
     data: {
@@ -486,9 +478,6 @@ router.post('/notificacoes/configurar', (req: AuthRequest, res) => {
     sms 
   } = req.body;
   
-  console.log('=== CONFIGURAR NOTIFICAÇÕES ===');
-  console.log('Configurações:', req.body);
-  
   res.json({
     message: 'Notificações configuradas com sucesso',
     data: {
@@ -512,9 +501,6 @@ router.post('/notificacoes/configurar', (req: AuthRequest, res) => {
 // Gerar link de pagamento
 router.post('/pagamentos/gerar-link', (req: AuthRequest, res) => {
   const { alunoId, valor, descricao, vencimento, metodosPermitidos } = req.body;
-  
-  console.log('=== GERAR LINK PAGAMENTO ===');
-  console.log('Dados:', { alunoId, valor, descricao, metodosPermitidos });
   
   const linkId = Math.random().toString(36).substr(2, 9);
   
@@ -643,9 +629,6 @@ router.get('/financeiro', (req, res) => {
 router.get('/config', (req: any, res) => {
   const professorId = req.user?.id;
   
-  console.log('=== CONFIGURAÇÕES DO PROFESSOR (FUNCIONAIS) ===');
-  console.log('Professor ID:', professorId);
-  
   return res.json({
     message: 'Configurações do professor',
     data: {
@@ -685,10 +668,6 @@ router.get('/config', (req: any, res) => {
 router.post('/config', (req: any, res) => {
   const professorId = req.user?.id;
   const configuracoes = req.body;
-  
-  console.log('=== ATUALIZAR CONFIGURAÇÕES (FUNCIONAIS) ===');
-  console.log('Professor ID:', professorId);
-  console.log('Novas configurações:', configuracoes);
   
   // Teste das notificações se solicitado
   if (configuracoes.testarNotificacoes) {
@@ -804,16 +783,10 @@ let duvidasMemoria: any[] = [
 router.get('/duvidas', (req: any, res) => {
   const professorId = req.user?.id;
   
-  console.log('=== LISTAR DÚVIDAS (BIDIRECIONAL) ===');
-  console.log('Professor ID:', professorId);
-  console.log('Total de dúvidas no sistema:', req.estadoGlobal.duvidasSistema.length);
-  
   // Filtrar dúvidas direcionadas a este professor
   const duvidasProfessor = req.estadoGlobal.duvidasSistema.filter(
     (duvida: any) => duvida.professorId === professorId
   );
-  
-  console.log('Dúvidas encontradas para este professor:', duvidasProfessor.length);
   
   // Adicionar as dúvidas padrão se não houver dúvidas específicas
   if (duvidasProfessor.length === 0) {
@@ -845,11 +818,6 @@ router.post('/duvidas/:id/responder', (req: any, res) => {
   const { id } = req.params;
   const { resposta } = req.body;
   const professorId = req.user?.id;
-  
-  console.log('=== RESPONDER DÚVIDA (BIDIRECIONAL) ===');
-  console.log('Dúvida ID:', id);
-  console.log('Professor ID:', professorId);
-  console.log('Resposta:', resposta);
   
   // Encontrar e atualizar a dúvida no sistema global
   const duvidaIndex = req.estadoGlobal.duvidasSistema.findIndex((d: any) => d.id === parseInt(id));
@@ -888,7 +856,6 @@ router.post('/duvidas/:id/responder', (req: any, res) => {
       `Olá! O professor respondeu sua pergunta sobre ${duvidaAtualizada.materia}:\n\nPergunta: ${duvidaAtualizada.pergunta}\nResposta: ${resposta}`
     );
     
-    console.log('✅ Dúvida atualizada:', duvidaAtualizada);
   } else {
     // Fallback para dúvidas locais
     const duvidaLocalIndex = duvidasMemoria.findIndex(d => d.id === parseInt(id));
@@ -899,9 +866,6 @@ router.post('/duvidas/:id/responder', (req: any, res) => {
         resposta,
         dataResposta: new Date().toISOString()
       };
-      console.log('✅ Dúvida local atualizada:', duvidasMemoria[duvidaLocalIndex]);
-    } else {
-      console.log('❌ Dúvida não encontrada');
     }
   }
   
@@ -937,10 +901,6 @@ router.post('/alunos/:id/contato', (req: AuthRequest, res) => {
   const { id } = req.params;
   const { mensagem, tipo } = req.body;
   
-  console.log('=== CONTATO COM ALUNO ===');
-  console.log('Aluno ID:', id);
-  console.log('Dados:', { mensagem, tipo });
-  
   res.json({
     message: 'Contato enviado com sucesso',
     data: {
@@ -956,9 +916,6 @@ router.post('/alunos/:id/contato', (req: AuthRequest, res) => {
 // Histórico do aluno
 router.get('/alunos/:id/historico', (req: AuthRequest, res) => {
   const { id } = req.params;
-  
-  console.log('=== HISTÓRICO DO ALUNO ===');
-  console.log('Aluno ID:', id);
   
   res.json({
     message: 'Histórico do aluno',
@@ -1003,9 +960,6 @@ router.get('/alunos/:id/historico', (req: AuthRequest, res) => {
 // === ROTAS PARA AÇÕES DOS EXERCÍCIOS ===
 // Criar exercício
 router.post('/exercicios/criar', (req: AuthRequest, res) => {
-  console.log('=== CRIAR EXERCÍCIO ===');
-  console.log('Dados recebidos:', req.body);
-  
   const { titulo, descricao, materia, prazo, alunos } = req.body;
   
   res.json({
@@ -1028,10 +982,6 @@ router.post('/exercicios/:id/enviar', (req: AuthRequest, res) => {
   const { id } = req.params;
   const { alunosIds, prazo } = req.body;
   
-  console.log('=== ENVIAR EXERCÍCIO ===');
-  console.log('Exercício ID:', id);
-  console.log('Dados:', { alunosIds, prazo });
-  
   res.json({
     message: 'Exercício enviado com sucesso',
     data: {
@@ -1047,9 +997,6 @@ router.post('/exercicios/:id/enviar', (req: AuthRequest, res) => {
 // Ver exercício específico
 router.get('/exercicios/:id/detalhes', (req: AuthRequest, res) => {
   const { id } = req.params;
-  
-  console.log('=== VER EXERCÍCIO ===');
-  console.log('Exercício ID:', id);
   
   res.json({
     message: 'Detalhes do exercício',
@@ -1089,8 +1036,6 @@ router.get('/exercicios/:id/detalhes', (req: AuthRequest, res) => {
 // === ROTAS PARA AGENDA E AULAS ===
 // Listar todas as aulas (para agenda)
 router.get('/agenda/aulas', (req: AuthRequest, res) => {
-  console.log('=== BUSCAR AULAS PARA AGENDA ===');
-  
   res.json({
     message: 'Aulas da agenda',
     data: [
@@ -1127,9 +1072,6 @@ router.get('/agenda/aulas', (req: AuthRequest, res) => {
 
 // Criar nova aula (para agenda)
 router.post('/agenda/nova-aula', (req: AuthRequest, res) => {
-  console.log('=== NOVA AULA (AGENDA) ===');
-  console.log('Dados recebidos:', req.body);
-  
   const { aluno, data, horario, materia, tipo, observacoes } = req.body;
   
   res.json({

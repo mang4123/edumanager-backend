@@ -39,8 +39,8 @@ const materiaisAluno: MaterialAluno[] = [
     tipo: "exercicio",
     materia: "Matemática",
     professor: "Professor Exemplo",
-    dataEnvio: "2024-01-19",
-    prazo: "2024-01-26",
+    dataEnvio: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 2 dias atrás
+    prazo: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 7 dias a partir de hoje
     status: "pendente",
     arquivo: "/materiais/algebra-lista-1.pdf"
   },
@@ -51,8 +51,8 @@ const materiaisAluno: MaterialAluno[] = [
     tipo: "exercicio",
     materia: "Português",
     professor: "Professor Exemplo", 
-    dataEnvio: "2024-01-17",
-    prazo: "2024-01-24",
+    dataEnvio: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 5 dias atrás
+    prazo: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 2 dias a partir de hoje
     status: "entregue",
     nota: 8.5,
     arquivo: "/materiais/redacao-tema-livre.pdf"
@@ -64,7 +64,7 @@ const materiaisAluno: MaterialAluno[] = [
     tipo: "material",
     materia: "Química",
     professor: "Professor Exemplo",
-    dataEnvio: "2024-01-15",
+    dataEnvio: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 7 dias atrás
     status: "disponivel",
     arquivo: "/materiais/quimica-organica.pdf"
   }
@@ -75,17 +75,17 @@ const duvidasAluno = [
     id: 1,
     pergunta: "Como resolver equações do segundo grau?",
     materia: "Matemática",
-    data: "2024-01-14",
+    data: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 3 dias atrás
     status: "respondida",
     urgencia: "normal",
     resposta: "Para resolver equações do 2º grau, use a fórmula de Bhaskara...",
-    dataResposta: "2024-01-14"
+    dataResposta: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] // 3 dias atrás
   },
   {
     id: 2,
     pergunta: "Qual a diferença entre ser e estar em inglês?",
     materia: "Inglês",
-    data: "2024-01-13",
+    data: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 4 dias atrás
     status: "pendente",
     urgencia: "baixa"
   }
@@ -94,30 +94,30 @@ const duvidasAluno = [
 const pagamentosAluno = {
   proximoPagamento: {
     valor: 120.00,
-    vencimento: "2024-02-15",
-    descricao: "Mensalidade - Fevereiro 2024"
+    vencimento: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 15 dias a partir de hoje
+    descricao: "Mensalidade - " + new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
   },
   historico: [
     {
       id: 1,
-      periodo: "Janeiro 2024",
+      periodo: new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }),
       valor: 120.00,
       status: "pago",
-      dataPagamento: "2024-01-10"
+      dataPagamento: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] // 10 dias atrás
     },
     {
       id: 2,
-      periodo: "Dezembro 2023",
+      periodo: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }),
       valor: 120.00,
       status: "pago",
-      dataPagamento: "2023-12-12"
+      dataPagamento: new Date(Date.now() - 40 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] // 40 dias atrás
     },
     {
       id: 3,
-      periodo: "Novembro 2023",
+      periodo: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }),
       valor: 120.00,
       status: "atrasado",
-      vencimento: "2023-11-15"
+      vencimento: new Date(Date.now() - 45 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] // 45 dias atrás
     }
   ]
 };

@@ -6,7 +6,7 @@ const router = Router();
 // Todas as rotas precisam de autenticação
 router.use(authenticateToken);
 
-// Lista de exercícios em memória
+// Lista de exercícios em memória - DATAS ATUALIZADAS E SEM QUESTÕES FIXAS
 let exerciciosMemoria: any[] = [
   {
     id: 1,
@@ -14,15 +14,16 @@ let exerciciosMemoria: any[] = [
     descricao: 'Resolva as equações propostas e justifique sua resposta',
     materia: 'Matemática',
     dificuldade: 'médio',
-    prazo: '2024-01-25',
+    prazo: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 7 dias a partir de hoje
     status: 'enviado',
-    dataEnvio: '2024-01-18',
+    dataEnvio: new Date().toISOString().split('T')[0], // Data de hoje
     alunos: [
       { id: 1, nome: 'João Silva', status: 'pendente' },
       { id: 2, nome: 'Maria Santos', status: 'entregue' }
     ],
     pontuacao: 10,
-    tipo: 'lista'
+    tipo: 'lista',
+    questoes: [] // Questões serão adicionadas dinamicamente
   },
   {
     id: 2,
@@ -30,58 +31,55 @@ let exerciciosMemoria: any[] = [
     descricao: 'Questões sobre as três leis de Newton',
     materia: 'Física',
     dificuldade: 'fácil',
-    prazo: '2024-01-22',
+    prazo: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 5 dias a partir de hoje
     status: 'corrigido',
-    dataEnvio: '2024-01-15',
+    dataEnvio: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 2 dias atrás
     alunos: [
       { id: 2, nome: 'Maria Santos', status: 'corrigido', nota: 9.0 }
     ],
     pontuacao: 8,
-    tipo: 'questões'
+    tipo: 'questões',
+    questoes: [] // Questões serão criadas dinamicamente
   }
 ];
 
 // Listar exercícios
 router.get('/', (req, res) => {
-  console.log('=== LISTAR EXERCÍCIOS ===');
-  console.log('Total de exercícios em memória:', exerciciosMemoria.length);
-  
   res.json({ 
     message: 'Lista de exercícios',
     data: exerciciosMemoria
   });
 });
 
-// Detalhes de um exercício específico
+// Detalhes de um exercício específico - SEM QUESTÕES PRÉ-DEFINIDAS
 router.get('/:id', (req, res) => {
   const { id } = req.params;
+  const exercicio = exerciciosMemoria.find(ex => ex.id === parseInt(id));
+  
+  if (!exercicio) {
+    return res.status(404).json({
+      message: 'Exercício não encontrado'
+    });
+  }
+  
   res.json({
     message: 'Detalhes do exercício',
     data: {
       id: parseInt(id),
-      titulo: 'Equações do 2º grau',
-      descricao: 'Resolva as equações propostas e justifique sua resposta',
-      materia: 'Matemática',
-      dificuldade: 'médio',
-      prazo: '2024-01-25',
-      status: 'enviado',
-      dataEnvio: '2024-01-18',
-      pontuacao: 10,
-      tipo: 'lista',
-      questoes: [
-        {
-          numero: 1,
-          enunciado: 'Resolva: x² - 5x + 6 = 0',
-          tipo: 'calculo'
-        },
-        {
-          numero: 2,
-          enunciado: 'Encontre as raízes de: 2x² + 3x - 2 = 0',
-          tipo: 'calculo'
-        }
-      ],
-      material: ['Livro cap. 8', 'Videoaula #15'],
-      observacoes: 'Foquem na demonstração do cálculo'
+      titulo: exercicio.titulo,
+      descricao: exercicio.descricao,
+      materia: exercicio.materia,
+      dificuldade: exercicio.dificuldade,
+      prazo: exercicio.prazo,
+      status: exercicio.status,
+      dataEnvio: exercicio.dataEnvio,
+      pontuacao: exercicio.pontuacao,
+      tipo: exercicio.tipo,
+      questoes: exercicio.questoes || [], // Questões vazias por padrão - professor pode adicionar
+      material: ['Consulte o material da disciplina'],
+      observacoes: 'Exercício criado dinamicamente',
+      instrucoes: 'As questões podem ser adicionadas pelo professor através do sistema',
+      permiteEdicao: true
     }
   });
 });
@@ -96,7 +94,7 @@ router.get('/aluno/:alunoId', (req, res) => {
         id: 1,
         titulo: 'Equações do 2º grau',
         materia: 'Matemática',
-        prazo: '2024-01-25',
+        prazo: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 7 dias a partir de hoje
         status: 'pendente',
         nota: null
       },
@@ -104,7 +102,7 @@ router.get('/aluno/:alunoId', (req, res) => {
         id: 2,
         titulo: 'Leis de Newton',
         materia: 'Física',
-        prazo: '2024-01-22',
+        prazo: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 3 dias a partir de hoje
         status: 'corrigido',
         nota: 9.0
       }
@@ -114,9 +112,6 @@ router.get('/aluno/:alunoId', (req, res) => {
 
 // Criar exercício (apenas professor)
 router.post('/', (req, res) => {
-  console.log('=== CRIAR EXERCÍCIO ===');
-  console.log('Dados recebidos:', req.body);
-  
   const { titulo, descricao, materia, prazo, dificuldade, alunos } = req.body;
   
   const novoExercicio = {
@@ -136,52 +131,37 @@ router.post('/', (req, res) => {
   // Adicionar à lista em memória
   exerciciosMemoria.push(novoExercicio);
   
-  console.log('✅ Exercício criado e adicionado! Total:', exerciciosMemoria.length);
-  console.log('Novo exercício:', novoExercicio);
-  
   res.json({ 
     message: 'Exercício criado',
     data: novoExercicio
   });
 });
 
-// Enviar exercício para aluno - FUNCIONAL
+// Enviar exercício para alunos específicos
 router.post('/:id/enviar', (req: any, res) => {
   const { id } = req.params;
-  const { alunosIds, prazo, observacoes } = req.body;
-  const professorId = req.user?.id;
+  const { alunosIds, prazo } = req.body;
+  const professorId = req.user?.id || 'professor-default';
   
-  console.log('=== ENVIAR EXERCÍCIO (FUNCIONAL) ===');
-  console.log('Exercício ID:', id);
-  console.log('Professor ID:', professorId);
-  console.log('Alunos IDs:', alunosIds);
-  console.log('Prazo:', prazo);
+  // Buscar exercício
+  const exercicio = exerciciosMemoria.find(ex => ex.id === parseInt(id));
   
-  if (!alunosIds || alunosIds.length === 0) {
-    return res.status(400).json({
-      message: 'Pelo menos um aluno deve ser selecionado'
+  if (!exercicio) {
+    return res.status(404).json({
+      message: 'Exercício não encontrado'
     });
   }
-  
-  // Buscar exercício da memória
-  const exercicioExistente = exerciciosMemoria.find(ex => ex.id === parseInt(id));
-  const exercicio = exercicioExistente || {
-    id: parseInt(id),
-    titulo: `Exercício #${id}`,
-    descricao: 'Exercício enviado pelo professor',
-    materia: 'Matemática'
-  };
   
   // Criar registro do exercício enviado no estado global
   const exercicioEnviado = {
     id: Date.now(),
     exercicioId: parseInt(id),
-    professorId: professorId || 'professor-default',
+    professorId: professorId,
     alunosIds: alunosIds,
     titulo: exercicio.titulo,
     descricao: exercicio.descricao,
     materia: exercicio.materia,
-    prazo: prazo || '2024-01-30',
+    prazo: prazo || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 7 dias a partir de hoje
     dataEnvio: new Date().toISOString(),
     status: 'enviado' as const
   };
@@ -215,10 +195,6 @@ router.post('/:id/enviar', (req: any, res) => {
       `Olá! Você recebeu um novo exercício de ${exercicio.materia}. Acesse sua área do aluno para visualizar. Prazo: ${prazo}`
     );
   });
-  
-  console.log('✅ Exercício enviado e notificações criadas!');
-  console.log('📊 Total exercícios enviados:', req.estadoGlobal.exerciciosEnviados.length);
-  console.log('📊 Total notificações:', req.estadoGlobal.notificacoesSistema.length);
   
   return res.json({
     message: 'Exercício enviado com sucesso para todos os alunos',
@@ -311,56 +287,25 @@ router.get('/questoes', (req, res) => {
 });
 
 // === SISTEMA DE UPLOAD DE MATERIAIS PARA PROFESSORES ===
-// Upload de material por professor
-router.post('/:id/upload-material', (req, res) => {
+// Upload de material para exercício
+router.post('/:id/upload', (req, res) => {
   const { id } = req.params;
-  const { arquivos, links, tipoMaterial = 'complementar', descricao } = req.body;
-  
-  console.log('=== UPLOAD MATERIAL (PROFESSOR) ===');
-  console.log('Exercício ID:', id);
-  console.log('Tipo:', tipoMaterial);
-  console.log('Arquivos:', arquivos?.length || 0);
-  console.log('Links:', links?.length || 0);
-  
-  const uploadId = Math.random().toString(36).substr(2, 9);
+  const { tipoMaterial, arquivos, links } = req.body;
   
   res.json({
-    message: 'Material enviado com sucesso',
+    message: 'Material adicionado ao exercício',
     data: {
-      uploadId,
       exercicioId: parseInt(id),
-      materiaisEnviados: {
-        arquivos: arquivos || [
-          {
-            nome: 'lista_exercicios.pdf',
-            tamanho: '1.8MB',
-            tipo: 'application/pdf',
-            url: `/uploads/professor/${uploadId}/lista_exercicios.pdf`
-          },
-          {
-            nome: 'exemplo_resolvido.jpg',
-            tamanho: '650KB',
-            tipo: 'image/jpeg',
-            url: `/uploads/professor/${uploadId}/exemplo_resolvido.jpg`
-          }
-        ],
-        links: links || [
-          {
-            titulo: 'Vídeo explicativo - Khan Academy',
-            url: 'https://www.khanacademy.org/math/algebra',
-            tipo: 'video'
-          },
-          {
-            titulo: 'Exercícios online',
-            url: 'https://www.matemática.com/exercicios',
-            tipo: 'exercicios'
-          }
-        ]
+      materiaisAdicionados: {
+        arquivos: arquivos?.length || 0,
+        links: links?.length || 0,
+        tipoMaterial
       },
-      tipoMaterial,
-      descricao: descricao || 'Material complementar do exercício',
-      dataEnvio: new Date().toISOString(),
-      alunosNotificados: ['João Silva', 'Maria Santos']
+      proximosPassos: [
+        'Enviar exercício para alunos',
+        'Definir prazo de entrega',
+        'Configurar notificações'
+      ]
     }
   });
 });
@@ -368,9 +313,6 @@ router.post('/:id/upload-material', (req, res) => {
 // Listar materiais de um exercício
 router.get('/:id/materiais', (req, res) => {
   const { id } = req.params;
-  
-  console.log('=== LISTAR MATERIAIS EXERCÍCIO ===');
-  console.log('Exercício ID:', id);
   
   res.json({
     message: 'Materiais do exercício',
@@ -419,8 +361,6 @@ router.get('/:id/materiais', (req, res) => {
 // === TIPOS DE ARQUIVO PERMITIDOS ===
 // Verificar tipos de arquivo permitidos
 router.get('/upload/tipos-permitidos', (req, res) => {
-  console.log('=== TIPOS ARQUIVO PERMITIDOS ===');
-  
   res.json({
     message: 'Tipos de arquivo permitidos',
     data: {
@@ -463,21 +403,200 @@ router.get('/upload/tipos-permitidos', (req, res) => {
   });
 });
 
-// Deletar material
-router.delete('/:exercicioId/material/:materialId', (req, res) => {
+// Deletar material de exercício
+router.delete('/:exercicioId/materiais/:materialId', (req, res) => {
   const { exercicioId, materialId } = req.params;
-  
-  console.log('=== DELETAR MATERIAL ===');
-  console.log('Exercício ID:', exercicioId);
-  console.log('Material ID:', materialId);
   
   res.json({
     message: 'Material removido com sucesso',
     data: {
       exercicioId: parseInt(exercicioId),
-      materialId: parseInt(materialId),
-      dataRemocao: new Date().toISOString(),
-      alunosNotificados: true
+      materialRemovidoId: parseInt(materialId),
+      materiaisRestantes: 2,
+      statusLimpeza: 'arquivo_removido_servidor'
+    }
+  });
+});
+
+// === GERENCIAMENTO DINÂMICO DE QUESTÕES ===
+// Adicionar questão a um exercício
+router.post('/:id/questoes', (req, res) => {
+  const { id } = req.params;
+  const { enunciado, tipo, alternativas, resposta, pontuacao } = req.body;
+  
+  const exercicio = exerciciosMemoria.find(ex => ex.id === parseInt(id));
+  
+  if (!exercicio) {
+    return res.status(404).json({
+      message: 'Exercício não encontrado'
+    });
+  }
+  
+  if (!enunciado || !tipo) {
+    return res.status(400).json({
+      message: 'Enunciado e tipo são obrigatórios'
+    });
+  }
+  
+  // Inicializar array de questões se não existir
+  if (!exercicio.questoes) {
+    exercicio.questoes = [];
+  }
+  
+  const novaQuestao = {
+    id: Date.now() + Math.random(),
+    numero: exercicio.questoes.length + 1,
+    enunciado,
+    tipo: tipo || 'dissertativa', // dissertativa, multipla_escolha, verdadeiro_falso, calculo
+    alternativas: alternativas || [],
+    resposta: resposta || '',
+    pontuacao: pontuacao || 1,
+    dataCriacao: new Date().toISOString()
+  };
+  
+  exercicio.questoes.push(novaQuestao);
+  
+  res.status(201).json({
+    message: 'Questão adicionada com sucesso',
+    data: {
+      questao: novaQuestao,
+      totalQuestoes: exercicio.questoes.length,
+      exercicio: {
+        id: exercicio.id,
+        titulo: exercicio.titulo,
+        totalPontuacao: exercicio.questoes.reduce((total: number, q: any) => total + q.pontuacao, 0)
+      }
+    }
+  });
+});
+
+// Editar questão de um exercício
+router.put('/:exercicioId/questoes/:questaoId', (req, res) => {
+  const { exercicioId, questaoId } = req.params;
+  const { enunciado, tipo, alternativas, resposta, pontuacao } = req.body;
+  
+  const exercicio = exerciciosMemoria.find(ex => ex.id === parseInt(exercicioId));
+  
+  if (!exercicio) {
+    return res.status(404).json({
+      message: 'Exercício não encontrado'
+    });
+  }
+  
+  if (!exercicio.questoes) {
+    return res.status(404).json({
+      message: 'Nenhuma questão encontrada neste exercício'
+    });
+  }
+  
+  const questao = exercicio.questoes.find((q: any) => q.id == questaoId);
+  
+  if (!questao) {
+    return res.status(404).json({
+      message: 'Questão não encontrada'
+    });
+  }
+  
+  // Atualizar questão
+  if (enunciado) questao.enunciado = enunciado;
+  if (tipo) questao.tipo = tipo;
+  if (alternativas) questao.alternativas = alternativas;
+  if (resposta !== undefined) questao.resposta = resposta;
+  if (pontuacao) questao.pontuacao = pontuacao;
+  questao.dataModificacao = new Date().toISOString();
+  
+  res.json({
+    message: 'Questão atualizada com sucesso',
+    data: {
+      questao,
+      exercicio: {
+        id: exercicio.id,
+        titulo: exercicio.titulo,
+        totalQuestoes: exercicio.questoes.length
+      }
+    }
+  });
+});
+
+// Remover questão de um exercício
+router.delete('/:exercicioId/questoes/:questaoId', (req, res) => {
+  const { exercicioId, questaoId } = req.params;
+  
+  const exercicio = exerciciosMemoria.find(ex => ex.id === parseInt(exercicioId));
+  
+  if (!exercicio) {
+    return res.status(404).json({
+      message: 'Exercício não encontrado'
+    });
+  }
+  
+  if (!exercicio.questoes) {
+    return res.status(404).json({
+      message: 'Nenhuma questão encontrada neste exercício'
+    });
+  }
+  
+  const questaoIndex = exercicio.questoes.findIndex((q: any) => q.id == questaoId);
+  
+  if (questaoIndex === -1) {
+    return res.status(404).json({
+      message: 'Questão não encontrada'
+    });
+  }
+  
+  const questaoRemovida = exercicio.questoes.splice(questaoIndex, 1)[0];
+  
+  // Renumerar questões
+  exercicio.questoes.forEach((q: any, index: number) => {
+    q.numero = index + 1;
+  });
+  
+  res.json({
+    message: 'Questão removida com sucesso',
+    data: {
+      questaoRemovida,
+      totalQuestoes: exercicio.questoes.length,
+      exercicio: {
+        id: exercicio.id,
+        titulo: exercicio.titulo
+      }
+    }
+  });
+});
+
+// Obter templates de questões para facilitar criação
+router.get('/templates/questoes', (req, res) => {
+  res.json({
+    message: 'Templates de questões disponíveis',
+    data: {
+      tipos: [
+        {
+          tipo: 'dissertativa',
+          nome: 'Questão Dissertativa',
+          exemplo: 'Explique o conceito de...',
+          campos: ['enunciado', 'pontuacao']
+        },
+        {
+          tipo: 'multipla_escolha',
+          nome: 'Múltipla Escolha',
+          exemplo: 'Qual é a resposta correta?',
+          campos: ['enunciado', 'alternativas', 'resposta', 'pontuacao']
+        },
+        {
+          tipo: 'verdadeiro_falso',
+          nome: 'Verdadeiro ou Falso',
+          exemplo: 'A afirmação X é verdadeira',
+          campos: ['enunciado', 'resposta', 'pontuacao']
+        },
+        {
+          tipo: 'calculo',
+          nome: 'Exercício de Cálculo',
+          exemplo: 'Resolva: 2x + 5 = 13',
+          campos: ['enunciado', 'resposta', 'pontuacao']
+        }
+      ],
+      materias: ['Matemática', 'Física', 'Química', 'Português', 'História', 'Geografia', 'Biologia', 'Inglês'],
+      dificuldades: ['fácil', 'médio', 'difícil']
     }
   });
 });
