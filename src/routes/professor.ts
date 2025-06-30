@@ -167,7 +167,6 @@ router.get('/alunos', async (req: AuthRequest, res) => {
                 id,
                 aluno_id,
                 professor_id,
-                nivel,
                 observacoes,
                 ativo,
                 created_at,
@@ -200,7 +199,6 @@ router.get('/alunos', async (req: AuthRequest, res) => {
                 nome: aluno.aluno_profile.nome,
                 email: aluno.aluno_profile.email,
                 telefone: aluno.aluno_profile.telefone,
-                nivel: aluno.nivel,
                 observacoes: aluno.observacoes,
                 ativo: aluno.ativo,
                 created_at: aluno.created_at
