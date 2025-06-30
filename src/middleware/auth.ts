@@ -32,22 +32,51 @@ export const authenticateToken = async (
     }
 
     // Busca informações do usuário na tabela profiles
+    console.log('Buscando perfil para usuário:', user.id, user.email || 'sem email');
+    
     const { data: profile, error: profileError } = await supabaseAdmin
       .from('profiles')
       .select('*')
       .eq('id', user.id)
       .single();
 
-    if (profileError || !profile) {
-      throw createError('Perfil do usuário não encontrado', 401);
-    }
+    console.log('Profile encontrado:', profile);
+    console.log('Erro profile:', profileError);
 
-    req.user = {
-      id: profile.id,
-      email: profile.email,
-      tipo: profile.user_type === 'teacher' ? 'professor' : 'aluno',
-      role: profile.user_type
-    };
+    if (profileError || !profile) {
+      // Criar perfil básico se não existir
+      console.log('Criando perfil básico para:', user.id);
+      const userEmail = user.email || 'user@example.com';
+      const { data: newProfile, error: insertError } = await supabaseAdmin
+        .from('profiles')
+        .insert({
+          id: user.id,
+          email: userEmail,
+          nome: userEmail.split('@')[0],
+          tipo: 'professor'
+        })
+        .select()
+        .single();
+
+      if (insertError) {
+        console.error('Erro ao criar perfil:', insertError);
+        throw createError('Perfil do usuário não encontrado e não foi possível criar', 401);
+      }
+
+      req.user = {
+        id: newProfile.id,
+        email: newProfile.email,
+        tipo: 'professor',
+        role: 'teacher'
+      };
+    } else {
+      req.user = {
+        id: profile.id,
+        email: profile.email,
+        tipo: profile.tipo === 'teacher' || profile.tipo === 'professor' ? 'professor' : 'aluno',
+        role: profile.tipo === 'professor' ? 'teacher' : 'student'
+      };
+    }
 
     next();
   } catch (error: any) {

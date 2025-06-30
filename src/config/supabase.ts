@@ -4,7 +4,8 @@ import dotenv from 'dotenv';
 // Carrega variáveis de ambiente
 dotenv.config();
 
-const supabaseUrl = process.env.SUPABASE_URL!;
+// Usar o Supabase do Lovable
+const supabaseUrl = 'https://qyaorhetkrgmkrtzjpvm.supabase.co';
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
