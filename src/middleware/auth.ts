@@ -24,7 +24,7 @@ export const authenticateToken = async (
       throw createError('Token de acesso requerido', 401);
     }
 
-    // Verifica o token com Supabase Auth
+    // Verifica o token do Supabase
     const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
     
     if (authError || !user) {
