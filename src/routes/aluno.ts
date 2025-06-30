@@ -77,14 +77,14 @@ router.get('/profile', async (req, res) => {
       }
     };
 
-    res.json({
+    return res.json({
       message: "Perfil do aluno",
       data: aluno
     });
 
   } catch (error) {
     console.error('Erro ao buscar perfil do aluno:', error);
-    res.status(500).json({ error: 'Erro interno do servidor' });
+    return res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
 
@@ -119,14 +119,14 @@ router.get('/materiais', async (req, res) => {
       arquivo: ex.anexo_url
     })) || [];
 
-    res.json({
+    return res.json({
       message: "Lista de materiais do aluno",
       data: materiais
     });
 
   } catch (error) {
     console.error('Erro ao buscar materiais:', error);
-    res.status(500).json({ error: 'Erro interno do servidor' });
+    return res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
 
@@ -148,14 +148,14 @@ router.get('/duvidas', async (req, res) => {
       console.error('Erro ao buscar dúvidas:', error);
     }
 
-    res.json({
+    return res.json({
       message: "Dúvidas do aluno",
       data: duvidas || []
     });
 
   } catch (error) {
     console.error('Erro ao buscar dúvidas:', error);
-    res.status(500).json({ error: 'Erro interno do servidor' });
+    return res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
 
@@ -182,14 +182,14 @@ router.get('/financeiro', async (req, res) => {
       historico: pagamentos || []
     };
 
-    res.json({
+    return res.json({
       message: "Dados financeiros do aluno",
       data: dadosFinanceiros
     });
 
   } catch (error) {
     console.error('Erro ao buscar dados financeiros:', error);
-    res.status(500).json({ error: 'Erro interno do servidor' });
+    return res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
 
@@ -226,14 +226,14 @@ router.post('/duvidas', async (req, res) => {
       return res.status(500).json({ error: 'Erro ao criar dúvida' });
     }
 
-    res.json({
+    return res.json({
       message: 'Dúvida enviada com sucesso',
       data: novaDuvida
     });
 
   } catch (error) {
     console.error('Erro ao criar dúvida:', error);
-    res.status(500).json({ error: 'Erro interno do servidor' });
+    return res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
 
