@@ -162,29 +162,54 @@ router.get('/alunos', async (req: AuthRequest, res) => {
         const userId = req.user!.id;
         
         const { data: alunos, error } = await supabaseAdmin
-            .from('profiles')
+            .from('alunos')
             .select(`
                 id,
-                nome,
-                email,
-                telefone,
+                aluno_id,
+                professor_id,
+                nivel,
+                observacoes,
+                ativo,
                 created_at,
-                updated_at
+                aluno_profile:profiles!alunos_aluno_id_fkey(
+                    id,
+                    nome,
+                    email,
+                    telefone
+                )
             `)
             .eq('professor_id', userId)
-            .eq('tipo', 'aluno')
+            .eq('ativo', true)
             .order('created_at', { ascending: false });
 
         if (error) {
+            console.error('Erro na consulta alunos:', error);
             return res.status(400).json({ 
                 success: false, 
-                error: 'Erro ao buscar alunos' 
+                error: 'Erro ao buscar alunos',
+                details: error.message
             });
         }
 
+        // Filtrar apenas alunos com profile válido e formatar resposta
+        const alunosFormatados = (alunos || [])
+            .filter((aluno: any) => aluno.aluno_profile)
+            .map((aluno: any) => ({
+                id: aluno.id,
+                aluno_id: aluno.aluno_id,
+                nome: aluno.aluno_profile.nome,
+                email: aluno.aluno_profile.email,
+                telefone: aluno.aluno_profile.telefone,
+                nivel: aluno.nivel,
+                observacoes: aluno.observacoes,
+                ativo: aluno.ativo,
+                created_at: aluno.created_at
+            }));
+
         return res.json({
             success: true,
-            data: alunos || []
+            data: alunosFormatados,
+            total: alunosFormatados.length
         });
     } catch (error) {
         console.error('Erro ao buscar alunos:', error);
