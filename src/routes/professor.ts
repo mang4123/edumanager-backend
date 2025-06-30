@@ -782,58 +782,10 @@ router.get('/aulas', async (req: AuthRequest, res) => {
                 aulas = data;
             }
         } catch (supabaseError) {
-            console.log('Tabela aulas não existe, criando dados de exemplo...');
+            console.log('Erro ao buscar aulas:', supabaseError);
         }
 
-        // Se não há aulas no banco, retornar dados de exemplo
-        if (aulas.length === 0) {
-            // Buscar alguns alunos do professor para criar aulas de exemplo
-            const { data: alunos } = await supabaseAdmin
-                .from('profiles')
-                .select('id, nome, email')
-                .eq('professor_id', userId)
-                .eq('tipo', 'aluno')
-                .limit(3);
-
-            if (alunos && alunos.length > 0) {
-                aulas = alunos.map((aluno, index) => ({
-                    id: `aula-${index + 1}`,
-                    aluno_id: aluno.id,
-                    professor_id: userId,
-                    data_hora: new Date(Date.now() + (index + 1) * 24 * 60 * 60 * 1000).toISOString(),
-                    materia: ['Matemática', 'Física', 'Química'][index] || 'Matemática',
-                    topico: `Aula ${index + 1} - Tópico Exemplo`,
-                    status: 'agendada',
-                    tipo: 'presencial',
-                    duracao: 60,
-                    valor: 100,
-                    aluno: {
-                        id: aluno.id,
-                        nome: aluno.nome,
-                        email: aluno.email
-                    }
-                }));
-            } else {
-                // Se não há alunos, criar uma aula de exemplo
-                aulas = [{
-                    id: 'aula-exemplo',
-                    aluno_id: 'aluno-exemplo',
-                    professor_id: userId,
-                    data_hora: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-                    materia: 'Matemática',
-                    topico: 'Aula de Exemplo',
-                    status: 'agendada',
-                    tipo: 'presencial',
-                    duracao: 60,
-                    valor: 100,
-                    aluno: {
-                        id: 'aluno-exemplo',
-                        nome: 'Aluno de Exemplo',
-                        email: 'aluno@exemplo.com'
-                    }
-                }];
-            }
-        }
+        // Retornar apenas aulas reais do banco de dados
 
         res.json({ 
             success: true,
@@ -933,60 +885,10 @@ router.get('/exercicios', async (req: AuthRequest, res) => {
                 }));
             }
         } catch (supabaseError) {
-            console.log('Tabela exercicios não existe, criando dados de exemplo...');
+            console.log('Erro ao buscar exercícios:', supabaseError);
         }
 
-        // Se não há exercícios no banco, retornar dados de exemplo
-        if (exercicios.length === 0) {
-            // Buscar alguns alunos do professor para criar exercícios de exemplo
-            const { data: alunos } = await supabaseAdmin
-                .from('profiles')
-                .select('id, nome, email')
-                .eq('professor_id', userId)
-                .eq('tipo', 'aluno')
-                .limit(3);
-
-            const nomesAlunos = alunos?.map(a => a.nome) || ['Aluno de Exemplo'];
-
-            exercicios = [
-                {
-                    id: 'ex-1',
-                    titulo: 'Equações do 2º grau',
-                    descricao: 'Resolva as equações quadráticas apresentadas',
-                    materia: 'Matemática',
-                    dificuldade: 'médio',
-                    status: 'enviado',
-                    prazo: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-                    created_at: new Date().toISOString(),
-                    professor_id: userId,
-                    alunos: nomesAlunos.slice(0, 2)
-                },
-                {
-                    id: 'ex-2',
-                    titulo: 'Leis de Newton',
-                    descricao: 'Exercícios sobre as três leis de Newton',
-                    materia: 'Física',
-                    dificuldade: 'fácil',
-                    status: 'corrigido',
-                    prazo: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-                    created_at: new Date().toISOString(),
-                    professor_id: userId,
-                    alunos: nomesAlunos.slice(0, 1)
-                },
-                {
-                    id: 'ex-3',
-                    titulo: 'Balanceamento de Equações',
-                    descricao: 'Pratique o balanceamento de equações químicas',
-                    materia: 'Química',
-                    dificuldade: 'difícil',
-                    status: 'pendente',
-                    prazo: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-                    created_at: new Date().toISOString(),
-                    professor_id: userId,
-                    alunos: nomesAlunos
-                }
-            ];
-        }
+        // Retornar apenas exercícios reais do banco de dados
 
         res.json({ 
             success: true,
@@ -1055,31 +957,48 @@ router.post('/exercicios', (req: any, res) => {
 });
 
 // Financeiro
-router.get('/financeiro', (req, res) => {
-  res.json({ 
-    message: 'Relatório financeiro',
-    data: {
-      totalRecebido: 2500.00,
-      totalPendente: 800.00,
-      mesAtual: 1500.00,
-      pagamentosRecentes: [
-        {
-          id: 1,
-          aluno: 'João Silva',
-          valor: 100.00,
-          data: '2024-01-20',
-          status: 'pago'
-        },
-        {
-          id: 2,
-          aluno: 'Maria Santos',
-          valor: 100.00,
-          data: '2024-01-18',
-          status: 'pendente'
-        }
-      ]
+router.get('/financeiro', async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.id;
+    
+    // Buscar dados financeiros reais
+    const { data: dadosFinanceiros, error } = await supabaseAdmin
+      .from('financeiro')
+      .select(`
+        *,
+        aluno:profiles!financeiro_aluno_id_fkey(nome)
+      `)
+      .eq('professor_id', userId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Erro ao buscar dados financeiros:', error);
     }
-  });
+
+    const totalRecebido = dadosFinanceiros?.filter(d => d.status === 'pago').reduce((sum, d) => sum + (d.valor || 0), 0) || 0;
+    const totalPendente = dadosFinanceiros?.filter(d => d.status === 'pendente').reduce((sum, d) => sum + (d.valor || 0), 0) || 0;
+    
+    const pagamentosRecentes = dadosFinanceiros?.slice(0, 10).map(d => ({
+      id: d.id,
+      aluno: d.aluno?.nome || 'Aluno',
+      valor: d.valor,
+      data: d.created_at?.split('T')[0],
+      status: d.status
+    })) || [];
+
+    res.json({ 
+      message: 'Relatório financeiro',
+      data: {
+        totalRecebido,
+        totalPendente,
+        mesAtual: totalRecebido,
+        pagamentosRecentes
+      }
+    });
+  } catch (error) {
+    console.error('Erro ao buscar dados financeiros:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
 });
 
 // Configurações - FUNCIONAIS
