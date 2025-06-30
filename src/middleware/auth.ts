@@ -25,10 +25,16 @@ export const authenticateToken = async (
     }
 
     // Verifica o token do Supabase
+    console.log('Token recebido:', token?.substring(0, 50) + '...');
+    
     const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
     
+    console.log('User do Supabase:', user?.id, user?.email);
+    console.log('Erro auth:', authError);
+    
     if (authError || !user) {
-      throw createError('Token inválido ou expirado', 401);
+      console.error('Erro de autenticação:', authError);
+      throw createError('Token inválido ou expirado: ' + (authError?.message || 'Usuário não encontrado'), 401);
     }
 
     // Busca informações do usuário na tabela profiles
