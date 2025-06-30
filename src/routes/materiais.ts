@@ -4,6 +4,15 @@ import { authenticateToken, AuthRequest } from '../middleware/auth';
 
 const router = express.Router();
 
+// Rota de teste
+router.get('/test', (req, res) => {
+    res.json({
+        success: true,
+        message: 'API de materiais funcionando!',
+        timestamp: new Date().toISOString()
+    });
+});
+
 // Listar exercícios do professor
 router.get('/exercicios', authenticateToken, async (req: AuthRequest, res) => {
     try {
@@ -15,7 +24,18 @@ router.get('/exercicios', authenticateToken, async (req: AuthRequest, res) => {
             .eq('professor_id', userId)
             .order('created_at', { ascending: false });
 
-        if (error) throw error;
+        if (error) {
+            console.log('Erro ao buscar exercícios:', error.message);
+            // Se tabela não existe, retornar array vazio
+            if (error.message.includes('does not exist')) {
+                return res.json({
+                    success: true,
+                    data: [],
+                    message: 'Tabela exercicios não existe ainda. Precisa ser criada.'
+                });
+            }
+            throw error;
+        }
 
         res.json({
             success: true,
@@ -57,7 +77,32 @@ router.post('/exercicios', authenticateToken, async (req: AuthRequest, res) => {
             .select()
             .single();
 
-        if (error) throw error;
+        if (error) {
+            if (error.message.includes('does not exist')) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Tabela exercicios não existe. Execute o SQL de criação primeiro.',
+                    sql_needed: `
+CREATE TABLE IF NOT EXISTS exercicios (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    professor_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+    titulo VARCHAR(255) NOT NULL,
+    descricao TEXT,
+    tipo VARCHAR(50),
+    anexo_url TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+ALTER TABLE exercicios ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "professor_exercicios_policy" ON exercicios
+    FOR ALL USING (professor_id = 'e650f5ee-747b-4574-9bfa-8e2d411c4974'::uuid);
+                    `
+                });
+            }
+            throw error;
+        }
 
         res.status(201).json({
             success: true,
@@ -145,69 +190,6 @@ router.delete('/exercicios/:id', authenticateToken, async (req: AuthRequest, res
         res.status(500).json({
             success: false,
             message: 'Erro interno do servidor',
-            error: error.message
-        });
-    }
-});
-
-// Rota para inicializar tabela exercicios (apenas para setup)
-router.post('/setup-table', async (req, res) => {
-    try {
-        console.log('🔧 Iniciando setup da tabela exercicios...');
-
-        // Verificar se tabela já existe
-        const { data: existing, error: checkError } = await supabaseAdmin
-            .from('exercicios')
-            .select('id')
-            .limit(1);
-
-        if (!checkError) {
-            return res.json({
-                success: true,
-                message: 'Tabela exercicios já existe e está funcionando!'
-            });
-        }
-
-        // Se chegou aqui, tabela não existe - criar via SQL
-        const createTableSQL = `
-            CREATE TABLE IF NOT EXISTS exercicios (
-                id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-                professor_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
-                titulo VARCHAR(255) NOT NULL,
-                descricao TEXT,
-                tipo VARCHAR(50),
-                anexo_url TEXT,
-                created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-                updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-            );
-
-            CREATE INDEX IF NOT EXISTS idx_exercicios_professor_id ON exercicios(professor_id);
-            
-            ALTER TABLE exercicios ENABLE ROW LEVEL SECURITY;
-            
-            CREATE POLICY IF NOT EXISTS "Professores podem gerenciar próprios exercícios" ON exercicios
-                FOR ALL USING (professor_id = 'e650f5ee-747b-4574-9bfa-8e2d411c4974'::uuid);
-        `;
-
-        const { error: createError } = await supabaseAdmin.rpc('exec_sql', { 
-            sql: createTableSQL 
-        });
-
-        if (createError) {
-            console.error('Erro ao criar tabela:', createError);
-            throw createError;
-        }
-
-        res.json({
-            success: true,
-            message: 'Tabela exercicios criada com sucesso!'
-        });
-
-    } catch (error: any) {
-        console.error('Erro no setup:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Erro ao configurar tabela',
             error: error.message
         });
     }
