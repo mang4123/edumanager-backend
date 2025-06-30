@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import jwt from 'jsonwebtoken';
 import { supabaseAdmin } from '../config/supabase';
 import { createError } from './errorHandler';
 
@@ -24,66 +25,82 @@ export const authenticateToken = async (
       throw createError('Token de acesso requerido', 401);
     }
 
-    // Verifica o token do Supabase
     console.log('Token recebido:', token?.substring(0, 50) + '...');
     
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    let userId: string;
+    let userEmail: string;
     
-    console.log('User do Supabase:', user?.id, user?.email);
-    console.log('Erro auth:', authError);
-    
-    if (authError || !user) {
-      console.error('Erro de autenticação:', authError);
-      throw createError('Token inválido ou expirado: ' + (authError?.message || 'Usuário não encontrado'), 401);
+    try {
+      // Primeiro tenta como token do Supabase Lovable
+      const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+      
+      if (user && !authError) {
+        userId = user.id;
+        userEmail = user.email || '';
+        console.log('Token Supabase válido - User:', userId, userEmail);
+      } else {
+        // Se falhar, tenta decodificar como JWT direto (fallback)
+        console.log('Tentando decodificar JWT direto...');
+        const decoded = jwt.decode(token) as any;
+        
+        if (!decoded || !decoded.sub) {
+          throw createError('Token inválido: não foi possível decodificar', 401);
+        }
+        
+        userId = decoded.sub;
+        userEmail = decoded.email || decoded.user_metadata?.email || '';
+        console.log('JWT decodificado - User:', userId, userEmail);
+      }
+    } catch (jwtError: any) {
+      console.error('Erro na validação do token:', jwtError.message);
+      throw createError('Token inválido ou expirado: ' + jwtError.message, 401);
     }
 
-    // Busca informações do usuário na tabela profiles
-    console.log('Buscando perfil para usuário:', user.id, user.email || 'sem email');
+    // Busca informações do usuário na tabela profiles usando o supabaseAdmin
+    console.log('Buscando perfil para usuário:', userId);
     
     const { data: profile, error: profileError } = await supabaseAdmin
       .from('profiles')
       .select('*')
-      .eq('id', user.id)
+      .eq('id', userId)
       .single();
 
     console.log('Profile encontrado:', profile);
     console.log('Erro profile:', profileError);
 
     if (profileError || !profile) {
-      // Criar perfil básico se não existir
-      console.log('Criando perfil básico para:', user.id);
-      const userEmail = user.email || 'user@example.com';
-      const { data: newProfile, error: insertError } = await supabaseAdmin
-        .from('profiles')
-        .insert({
-          id: user.id,
-          email: userEmail,
-          nome: userEmail.split('@')[0],
-          tipo: 'professor'
-        })
-        .select()
-        .single();
-
-      if (insertError) {
-        console.error('Erro ao criar perfil:', insertError);
-        throw createError('Perfil do usuário não encontrado e não foi possível criar', 401);
+      // Se não encontrar por ID, tenta por email
+      if (userEmail) {
+        console.log('Tentando buscar por email:', userEmail);
+        const { data: profileByEmail, error: emailError } = await supabaseAdmin
+          .from('profiles')
+          .select('*')
+          .eq('email', userEmail)
+          .single();
+        
+        if (profileByEmail && !emailError) {
+          req.user = {
+            id: profileByEmail.id,
+            email: profileByEmail.email,
+            tipo: profileByEmail.tipo === 'teacher' || profileByEmail.tipo === 'professor' ? 'professor' : 'aluno',
+            role: profileByEmail.tipo === 'professor' ? 'teacher' : 'student'
+          };
+          return next();
+        }
       }
-
-      req.user = {
-        id: newProfile.id,
-        email: newProfile.email,
-        tipo: 'professor',
-        role: 'teacher'
-      };
-    } else {
-      req.user = {
-        id: profile.id,
-        email: profile.email,
-        tipo: profile.tipo === 'teacher' || profile.tipo === 'professor' ? 'professor' : 'aluno',
-        role: profile.tipo === 'professor' ? 'teacher' : 'student'
-      };
+      
+      console.error('Perfil não encontrado para:', userId, userEmail);
+      throw createError('Perfil do usuário não encontrado', 401);
     }
 
+    req.user = {
+      id: profile.id,
+      email: profile.email,
+      tipo: profile.tipo === 'teacher' || profile.tipo === 'professor' ? 'professor' : 'aluno',
+      role: profile.tipo === 'professor' ? 'teacher' : 'student'
+    };
+
+    console.log('Usuário autenticado:', req.user);
     next();
   } catch (error: any) {
     console.error('Erro na autenticação:', error);
