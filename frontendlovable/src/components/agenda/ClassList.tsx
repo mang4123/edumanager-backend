@@ -39,7 +39,7 @@ export const ClassList = ({ selectedDate, aulas, onDeleteClass }: ClassListProps
                     <div className="flex items-center space-x-2 mb-2">
                       <User className="w-4 h-4 text-primary-600" />
                       <span className="font-medium">
-                        {aula.aluno?.profiles?.[0]?.name}
+                        {aula.aluno_profile?.nome || 'Aluno não encontrado'}
                       </span>
                       <span className="text-sm text-gray-500">
                         {format(new Date(aula.data_hora), 'HH:mm')}

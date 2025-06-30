@@ -26,47 +26,21 @@ export const useTeacherAgenda = () => {
 
   const fetchAulas = async () => {
     try {
-      // 1. Buscar aulas SEM JOIN problemático
-      const { data: aulasData, error: aulasError } = await supabase
+      console.log('🔍 Buscando aulas...');
+      
+      // Primeiro, buscar aulas simples
+      const { data, error } = await supabase
         .from('aulas')
         .select('*')
         .order('data_hora', { ascending: true });
 
-      if (aulasError) throw aulasError;
-      
-      if (!aulasData || aulasData.length === 0) {
-        console.log('Nenhuma aula encontrada');
-        setAulas([]);
-        return;
+      if (error) {
+        console.error('❌ Erro ao buscar aulas:', error);
+        throw error;
       }
 
-      // 2. Buscar profiles dos alunos separadamente
-      const alunoIds = [...new Set(aulasData.map(aula => aula.aluno_id))];
-      
-      if (alunoIds.length > 0) {
-        const { data: profilesData, error: profilesError } = await supabase
-          .from('profiles')
-          .select('id, nome, email')
-          .in('id', alunoIds);
-
-        if (profilesError) {
-          console.error('Erro ao buscar profiles das aulas:', profilesError);
-        }
-
-        // 3. Combinar dados no frontend
-        const aulasComDados = aulasData.map(aula => ({
-          ...aula,
-          aluno_profile: profilesData?.find(profile => profile.id === aula.aluno_id) || {
-            nome: 'Aluno não encontrado',
-            email: ''
-          }
-        }));
-
-        setAulas(aulasComDados);
-      } else {
-        setAulas(aulasData);
-      }
-      
+      console.log('✅ Aulas encontradas:', data?.length || 0);
+      setAulas(data || []);
     } catch (error) {
       console.error('Erro ao buscar aulas:', error);
       toast({
@@ -74,57 +48,33 @@ export const useTeacherAgenda = () => {
         description: "Não foi possível carregar as aulas",
         variant: "destructive"
       });
-      setAulas([]); // Importante: definir array vazio em caso de erro
     }
   };
 
   const fetchAlunos = async () => {
     try {
-      // 1. Buscar alunos SEM JOIN problemático
-      const { data: alunosData, error: alunosError } = await supabase
+      console.log('🔍 Buscando alunos...');
+      
+      // Primeiro, buscar alunos simples
+      const { data, error } = await supabase
         .from('alunos')
-        .select('id, aluno_id, ativo')
+        .select('*')
         .eq('ativo', true);
 
-      if (alunosError) throw alunosError;
-
-      if (!alunosData || alunosData.length === 0) {
-        console.log('Nenhum aluno encontrado');
-        setAlunos([]);
-        return;
+      if (error) {
+        console.error('❌ Erro ao buscar alunos:', error);
+        throw error;
       }
 
-      // 2. Buscar profiles dos alunos separadamente
-      const alunoIds = alunosData.map(aluno => aluno.aluno_id);
-      
-      if (alunoIds.length > 0) {
-        const { data: profilesData, error: profilesError } = await supabase
-          .from('profiles')
-          .select('id, nome, email')
-          .in('id', alunoIds);
-
-        if (profilesError) {
-          console.error('Erro ao buscar profiles dos alunos:', profilesError);
-        }
-
-        // 3. Combinar dados no frontend
-        const alunosComDados = alunosData.map(aluno => ({
-          ...aluno,
-          aluno_profile: profilesData?.find(profile => profile.id === aluno.aluno_id) || {
-            id: aluno.aluno_id,
-            nome: 'Aluno não encontrado',
-            email: ''
-          }
-        }));
-
-        setAlunos(alunosComDados);
-      } else {
-        setAlunos(alunosData);
-      }
-
+      console.log('✅ Alunos encontrados:', data?.length || 0);
+      setAlunos(data || []);
     } catch (error) {
       console.error('Erro ao buscar alunos:', error);
-      setAlunos([]); // Importante: definir array vazio em caso de erro
+      toast({
+        title: "Erro",
+        description: "Não foi possível carregar os alunos",
+        variant: "destructive"
+      });
     }
   };
 
@@ -135,7 +85,7 @@ export const useTeacherAgenda = () => {
         description: "Preencha todos os campos obrigatórios",
         variant: "destructive"
       });
-      return false;
+      return;
     }
 
     setLoading(true);
@@ -172,10 +122,8 @@ export const useTeacherAgenda = () => {
         assunto: '',
         observacoes: ''
       });
-      
-      fetchAulas(); // Recarregar aulas
+      fetchAulas();
       return true;
-      
     } catch (error) {
       console.error('Erro ao criar aula:', error);
       toast({
@@ -203,8 +151,7 @@ export const useTeacherAgenda = () => {
         description: "Aula desmarcada com sucesso!"
       });
 
-      fetchAulas(); // Recarregar aulas
-      
+      fetchAulas();
     } catch (error) {
       console.error('Erro ao deletar aula:', error);
       toast({
@@ -216,12 +163,12 @@ export const useTeacherAgenda = () => {
   };
 
   return {
-    aulas: aulas || [], // Garantir que sempre retorna array
-    alunos: alunos || [], // Garantir que sempre retorna array
+    aulas,
+    alunos,
     loading,
     newAula,
     setNewAula,
     handleCreateAula,
     handleDeleteAula
   };
-};
+}; 

@@ -7,18 +7,21 @@ export interface Aula {
   assunto: string;
   status: string;
   observacoes?: string;
-  aluno?: {
-    profiles: {
-      name: string;
-    }[];
+  aluno_profile?: {
+    nome: string;
+    email: string;
   };
 }
 
 export interface Aluno {
   id: string;
-  profiles: {
-    name: string;
-  }[];
+  aluno_id: string;
+  ativo: boolean;
+  aluno_profile?: {
+    id: string;
+    nome: string;
+    email: string;
+  };
 }
 
 export interface NewAula {

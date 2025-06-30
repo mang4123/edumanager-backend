@@ -10,6 +10,7 @@ import studentRoutes from './routes/student';
 import { aulaRoutes } from './routes/aula';
 import { exercicioRoutes } from './routes/exercicio';
 import { financeiroRoutes } from './routes/financeiro';
+import materiaisRoutes from './routes/materiais';
 import { authenticateToken, requireRole } from './middleware/auth';
 
 // Carrega variáveis de ambiente
@@ -162,6 +163,7 @@ app.use('/api/student', studentRoutes);
 app.use('/api/aula', aulaRoutes);
 app.use('/api/exercicio', authenticateToken, exercicioRoutes);
 app.use('/api/financeiro', financeiroRoutes);
+app.use('/api/materiais', materiaisRoutes);
 
 // === ROTAS AUXILIARES ===
 app.get('/api/alunos', authenticateToken, (req, res) => {

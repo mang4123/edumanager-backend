@@ -40,8 +40,8 @@ export const ClassForm = ({ newAula, setNewAula, alunos, loading, onSubmit, onCl
             </SelectTrigger>
             <SelectContent>
               {alunos.map((aluno) => (
-                <SelectItem key={aluno.id} value={aluno.id}>
-                  {aluno.profiles[0]?.name}
+                <SelectItem key={aluno.id} value={aluno.aluno_id}>
+                  {aluno.aluno_profile?.nome || 'Aluno sem nome'}
                 </SelectItem>
               ))}
             </SelectContent>

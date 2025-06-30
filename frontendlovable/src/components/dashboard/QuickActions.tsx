@@ -1,14 +1,15 @@
-
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Plus, Users, FileText } from 'lucide-react';
 import InviteStudentModal from './InviteStudentModal';
 import NewClassModal from './NewClassModal';
+import NewMaterialModal from './NewMaterialModal';
 
 const QuickActions = () => {
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
   const [newClassModalOpen, setNewClassModalOpen] = useState(false);
+  const [newMaterialModalOpen, setNewMaterialModalOpen] = useState(false);
 
   return (
     <>
@@ -33,7 +34,11 @@ const QuickActions = () => {
               <Users className="w-6 h-6" />
               <span>Convidar Aluno</span>
             </Button>
-            <Button variant="outline" className="h-20 flex-col space-y-2">
+            <Button 
+              variant="outline" 
+              className="h-20 flex-col space-y-2"
+              onClick={() => setNewMaterialModalOpen(true)}
+            >
               <FileText className="w-6 h-6" />
               <span>Novo Material</span>
             </Button>
@@ -49,6 +54,11 @@ const QuickActions = () => {
       <NewClassModal 
         open={newClassModalOpen} 
         onOpenChange={setNewClassModalOpen} 
+      />
+
+      <NewMaterialModal 
+        open={newMaterialModalOpen} 
+        onOpenChange={setNewMaterialModalOpen} 
       />
     </>
   );
