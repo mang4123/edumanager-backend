@@ -1,6 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import jwt from 'jsonwebtoken';
-import { supabase, supabaseAdmin } from '../config/supabase';
+import { supabaseAdmin } from '../config/supabase';
 import { createError } from './errorHandler';
 
 export interface AuthRequest extends Request {
@@ -8,6 +7,7 @@ export interface AuthRequest extends Request {
     id: string;
     email: string;
     tipo: 'professor' | 'aluno';
+    role?: 'teacher' | 'student';
   };
 }
 
@@ -24,37 +24,35 @@ export const authenticateToken = async (
       throw createError('Token de acesso requerido', 401);
     }
 
-    // Verifica o JWT próprio (não usa mais Supabase Auth)
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret') as any;
-
-    if (!decoded || !decoded.userId || !decoded.email) {
+    // Verifica o token com Supabase Auth
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    
+    if (authError || !user) {
       throw createError('Token inválido ou expirado', 401);
     }
 
-    // Busca informações do usuário na tabela profiles usando admin client
-    const { data: profile, error } = await supabaseAdmin
+    // Busca informações do usuário na tabela profiles
+    const { data: profile, error: profileError } = await supabaseAdmin
       .from('profiles')
       .select('*')
-      .eq('id', decoded.userId)
+      .eq('id', user.id)
       .single();
 
-    if (error || !profile) {
-      throw createError('Usuário não encontrado', 401);
+    if (profileError || !profile) {
+      throw createError('Perfil do usuário não encontrado', 401);
     }
 
     req.user = {
       id: profile.id,
       email: profile.email,
-      tipo: profile.tipo
+      tipo: profile.user_type === 'teacher' ? 'professor' : 'aluno',
+      role: profile.user_type
     };
 
     next();
   } catch (error: any) {
-    if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
-      next(createError('Token inválido ou expirado', 401));
-    } else {
-      next(error);
-    }
+    console.error('Erro na autenticação:', error);
+    next(createError('Erro na autenticação: ' + error.message, 401));
   }
 };
 

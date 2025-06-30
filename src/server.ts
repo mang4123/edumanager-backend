@@ -3,7 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
 import { errorHandler } from './middleware/errorHandler';
-import { authRoutes } from './routes/auth';
+// import { authRoutes } from './routes/auth'; // Removido - usando Supabase Auth diretamente
 import { professorRoutes } from './routes/professor';
 import alunoRoutes from './routes/aluno';
 import studentRoutes from './routes/student';
@@ -155,7 +155,7 @@ app.get('/health', (req, res) => {
 });
 
 // === ROTAS PRINCIPAIS ===
-app.use('/api/auth', authRoutes);
+// app.use('/api/auth', authRoutes); // Removido - usando Supabase Auth diretamente
 app.use('/api/professor', authenticateToken, requireRole(['professor']), professorRoutes);
 app.use('/api/aluno', authenticateToken, requireRole(['aluno']), alunoRoutes);
 app.use('/api/student', studentRoutes);
