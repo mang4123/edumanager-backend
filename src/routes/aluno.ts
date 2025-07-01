@@ -266,7 +266,7 @@ router.get('/duvidas', async (req, res) => {
       .select('*')
       .eq('aluno_id', user.id)
       .eq('professor_id', alunoData.professor_id)
-      .order('data_pergunta', { ascending: false });
+      .order('created_at', { ascending: false });
 
     if (duvidasError) {
       console.log('⚠️ [ALUNO] Tabela dúvidas pode não existir:', duvidasError);
@@ -329,9 +329,8 @@ router.post('/duvidas', async (req, res) => {
         aluno_id: user.id,
         professor_id: alunoData.professor_id,
         pergunta: pergunta.trim(),
-        assunto: assunto?.trim() || null,
-        respondida: false,
-        data_pergunta: new Date().toISOString()
+        assunto: assunto?.trim() || 'Geral',
+        respondida: false
       }])
       .select()
       .single();
