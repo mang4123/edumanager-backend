@@ -440,6 +440,270 @@ router.get('/financeiro', async (req, res) => {
   }
 });
 
+// Aceitar convite e vincular ao professor
+router.post('/aceitar-convite', async (req, res) => {
+  try {
+    console.log('=== ACEITAR CONVITE E VINCULAR ALUNO ===');
+    
+    const { token, aluno_id } = req.body;
+    
+    if (!token) {
+      return res.status(400).json({
+        success: false,
+        error: 'Token do convite é obrigatório'
+      });
+    }
+
+    console.log('🎟️ Verificando convite com token:', token);
+
+    // 1. Buscar convite válido
+    const { data: convite, error: conviteError } = await supabaseAdmin
+      .from('convites')
+      .select('*')
+      .eq('token', token)
+      .eq('usado', false)
+      .gte('expires_at', new Date().toISOString())
+      .single();
+
+    if (conviteError || !convite) {
+      console.error('❌ Convite não encontrado ou expirado:', conviteError);
+      return res.status(404).json({
+        success: false,
+        error: 'Convite não encontrado ou expirado'
+      });
+    }
+
+    console.log('✅ Convite válido encontrado:', convite.id, 'Professor:', convite.professor_id);
+
+    // 2. Verificar se o perfil do aluno existe, se não criar
+    const { data: alunoProfile, error: alunoProfileError } = await supabaseAdmin
+      .from('profiles')
+      .select('*')
+      .eq('id', aluno_id)
+      .single();
+
+    if (alunoProfileError && alunoProfileError.code === 'PGRST116') {
+      // Aluno não existe, criar perfil
+      console.log('➕ Criando perfil do aluno:', aluno_id);
+      
+      const { data: newAlunoProfile, error: createAlunoError } = await supabaseAdmin
+        .from('profiles')
+        .insert({
+          id: aluno_id,
+          nome: convite.nome || 'Aluno',
+          email: convite.email,
+          tipo: 'aluno',
+          professor_id: convite.professor_id,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .select()
+        .single();
+
+      if (createAlunoError) {
+        console.error('❌ Erro ao criar perfil do aluno:', createAlunoError);
+        return res.status(500).json({
+          success: false,
+          error: 'Erro ao criar perfil do aluno',
+          details: createAlunoError
+        });
+      }
+
+      console.log('✅ Perfil do aluno criado:', newAlunoProfile);
+    } else if (alunoProfile) {
+      // Aluno já existe, atualizar com professor_id
+      console.log('📝 Atualizando perfil existente do aluno');
+      
+      const { error: updateError } = await supabaseAdmin
+        .from('profiles')
+        .update({
+          professor_id: convite.professor_id,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', aluno_id);
+
+      if (updateError) {
+        console.error('❌ Erro ao atualizar perfil do aluno:', updateError);
+        return res.status(500).json({
+          success: false,
+          error: 'Erro ao vincular aluno ao professor',
+          details: updateError
+        });
+      }
+
+      console.log('✅ Perfil do aluno atualizado com professor_id');
+    }
+
+    // 3. Criar relacionamento na tabela alunos
+    const { data: relacionamento, error: relError } = await supabaseAdmin
+      .from('alunos')
+      .insert({
+        aluno_id: aluno_id,
+        professor_id: convite.professor_id,
+        observacoes: convite.observacoes || null,
+        ativo: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .select()
+      .single();
+
+    if (relError) {
+      console.error('❌ Erro ao criar relacionamento aluno-professor:', relError);
+      // Se já existe, tentar atualizar
+      const { error: updateRelError } = await supabaseAdmin
+        .from('alunos')
+        .update({
+          ativo: true,
+          updated_at: new Date().toISOString()
+        })
+        .eq('aluno_id', aluno_id)
+        .eq('professor_id', convite.professor_id);
+
+      if (updateRelError) {
+        console.error('❌ Erro ao atualizar relacionamento:', updateRelError);
+      } else {
+        console.log('✅ Relacionamento atualizado');
+      }
+    } else {
+      console.log('✅ Relacionamento aluno-professor criado:', relacionamento);
+    }
+
+    // 4. Marcar convite como usado
+    const { error: markUsedError } = await supabaseAdmin
+      .from('convites')
+      .update({
+        usado: true,
+        usado_em: new Date().toISOString(),
+        aluno_id: aluno_id,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', convite.id);
+
+    if (markUsedError) {
+      console.error('⚠️ Erro ao marcar convite como usado:', markUsedError);
+    } else {
+      console.log('✅ Convite marcado como usado');
+    }
+
+    // 5. Buscar dados do professor para retornar
+    const { data: professor, error: profError } = await supabaseAdmin
+      .from('profiles')
+      .select('id, nome, email, telefone')
+      .eq('id', convite.professor_id)
+      .single();
+
+    return res.json({
+      success: true,
+      message: 'Convite aceito e aluno vinculado com sucesso!',
+      data: {
+        professor: professor || { id: convite.professor_id, nome: 'Professor' },
+        aluno: {
+          id: aluno_id,
+          nome: convite.nome,
+          email: convite.email
+        },
+        vinculo_criado: new Date().toISOString()
+      }
+    });
+
+  } catch (error) {
+    console.error('💥 Erro ao aceitar convite:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Erro interno do servidor',
+      details: error instanceof Error ? error.message : 'Erro desconhecido'
+    });
+  }
+});
+
+// Validar convite (verificar se token é válido)
+router.get('/validar-convite/:token', async (req, res) => {
+  try {
+    console.log('=== VALIDAR CONVITE ===');
+    
+    const { token } = req.params;
+    
+    if (!token) {
+      return res.status(400).json({
+        success: false,
+        error: 'Token do convite é obrigatório'
+      });
+    }
+
+    console.log('🔍 Validando convite com token:', token);
+
+    // Buscar convite válido
+    const { data: convite, error: conviteError } = await supabaseAdmin
+      .from('convites')
+      .select(`
+        id,
+        professor_id,
+        nome,
+        email,
+        observacoes,
+        valor_aula,
+        data_vencimento,
+        expires_at,
+        usado,
+        created_at
+      `)
+      .eq('token', token)
+      .eq('usado', false)
+      .gte('expires_at', new Date().toISOString())
+      .single();
+
+    if (conviteError || !convite) {
+      console.error('❌ Convite não encontrado ou expirado:', conviteError);
+      return res.status(404).json({
+        success: false,
+        error: 'Convite não encontrado ou expirado'
+      });
+    }
+
+    // Buscar dados do professor
+    const { data: professor, error: profError } = await supabaseAdmin
+      .from('profiles')
+      .select('id, nome, email, telefone, especialidade')
+      .eq('id', convite.professor_id)
+      .single();
+
+    console.log('✅ Convite válido encontrado');
+
+    return res.json({
+      success: true,
+      message: 'Convite válido',
+      data: {
+        convite: {
+          id: convite.id,
+          nome_aluno: convite.nome,
+          email_aluno: convite.email,
+          observacoes: convite.observacoes,
+          valor_aula: convite.valor_aula,
+          data_vencimento: convite.data_vencimento,
+          expires_at: convite.expires_at,
+          created_at: convite.created_at
+        },
+        professor: professor || { 
+          id: convite.professor_id, 
+          nome: 'Professor',
+          email: null,
+          telefone: null,
+          especialidade: null
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('💥 Erro ao validar convite:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Erro interno do servidor',
+      details: error instanceof Error ? error.message : 'Erro desconhecido'
+    });
+  }
+});
+
 // 🔧 FUNÇÃO AUXILIAR: Buscar estatísticas reais do aluno
 async function buscarEstatisticasReais(alunoId: string) {
   try {

@@ -161,7 +161,10 @@ router.get('/alunos', async (req: AuthRequest, res) => {
     try {
         const userId = req.user!.id;
         
-        const { data: alunos, error } = await supabaseAdmin
+        console.log('🔍 Buscando alunos para professor:', userId);
+
+        // Buscar alunos vinculados ao professor na tabela de relacionamento
+        const { data: relacionamentos, error: relError } = await supabaseAdmin
             .from('alunos')
             .select(`
                 id,
@@ -169,40 +172,99 @@ router.get('/alunos', async (req: AuthRequest, res) => {
                 professor_id,
                 observacoes,
                 ativo,
-                created_at,
-                aluno_profile:profiles!alunos_aluno_id_fkey(
-                    id,
-                    nome,
-                    email,
-                    telefone
-                )
+                created_at
             `)
             .eq('professor_id', userId)
             .eq('ativo', true)
             .order('created_at', { ascending: false });
 
-        if (error) {
-            console.error('Erro na consulta alunos:', error);
-            return res.status(400).json({ 
-                success: false, 
-                error: 'Erro ao buscar alunos',
-                details: error.message
+        if (relError) {
+            console.error('Erro na consulta relacionamentos:', relError);
+            // Se der erro na tabela alunos, buscar direto na profiles
+            const { data: alunosProfiles, error: profilesError } = await supabaseAdmin
+                .from('profiles')
+                .select(`
+                    id,
+                    nome,
+                    email,
+                    telefone,
+                    created_at
+                `)
+                .eq('professor_id', userId)
+                .eq('tipo', 'aluno')
+                .order('created_at', { ascending: false });
+
+            if (profilesError) {
+                console.error('Erro ao buscar na tabela profiles:', profilesError);
+                return res.json({
+                    success: true,
+                    data: [],
+                    total: 0,
+                    message: 'Nenhum aluno encontrado'
+                });
+            }
+
+            const alunosFormatados = (alunosProfiles || []).map((aluno: any) => ({
+                id: aluno.id,
+                aluno_id: aluno.id,
+                nome: aluno.nome,
+                email: aluno.email,
+                telefone: aluno.telefone,
+                observacoes: null,
+                ativo: true,
+                created_at: aluno.created_at
+            }));
+
+            return res.json({
+                success: true,
+                data: alunosFormatados,
+                total: alunosFormatados.length
             });
         }
 
-        // Filtrar apenas alunos com profile válido e formatar resposta
-        const alunosFormatados = (alunos || [])
-            .filter((aluno: any) => aluno.aluno_profile)
-            .map((aluno: any) => ({
-                id: aluno.id,
-                aluno_id: aluno.aluno_id,
-                nome: aluno.aluno_profile.nome,
-                email: aluno.aluno_profile.email,
-                telefone: aluno.aluno_profile.telefone,
-                observacoes: aluno.observacoes,
-                ativo: aluno.ativo,
-                created_at: aluno.created_at
-            }));
+        // Se encontrou relacionamentos, buscar dados dos alunos
+        if (!relacionamentos || relacionamentos.length === 0) {
+            return res.json({
+                success: true,
+                data: [],
+                total: 0,
+                message: 'Nenhum aluno vinculado'
+            });
+        }
+
+        const alunosIds = relacionamentos.map(rel => rel.aluno_id);
+        
+        const { data: alunosProfiles, error: profilesError } = await supabaseAdmin
+            .from('profiles')
+            .select(`
+                id,
+                nome,
+                email,
+                telefone
+            `)
+            .in('id', alunosIds)
+            .eq('tipo', 'aluno');
+
+        if (profilesError) {
+            console.error('Erro ao buscar perfis dos alunos:', profilesError);
+        }
+
+        // Combinar dados dos relacionamentos com os perfis
+        const alunosFormatados = relacionamentos.map((rel: any) => {
+            const perfil = alunosProfiles?.find(p => p.id === rel.aluno_id);
+            return {
+                id: rel.id,
+                aluno_id: rel.aluno_id,
+                nome: perfil?.nome || 'Aluno',
+                email: perfil?.email || '',
+                telefone: perfil?.telefone || '',
+                observacoes: rel.observacoes,
+                ativo: rel.ativo,
+                created_at: rel.created_at
+            };
+        });
+
+        console.log('✅ Alunos encontrados:', alunosFormatados.length);
 
         return res.json({
             success: true,
