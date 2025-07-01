@@ -1,11 +1,10 @@
-
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, User } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 interface StudentHeaderProps {
   student: {
-    profiles: { name: string }[];
+    profiles: { nome: string }[];
     nivel: string;
   };
 }
@@ -29,7 +28,7 @@ const StudentHeader = ({ student }: StudentHeaderProps) => {
         </div>
         <div>
           <h1 className="text-2xl font-bold text-gray-900">
-            {student.profiles[0]?.name}
+            {student.profiles[0]?.nome}
           </h1>
           <p className="text-gray-500">Nível: {student.nivel || 'Não informado'}</p>
         </div>

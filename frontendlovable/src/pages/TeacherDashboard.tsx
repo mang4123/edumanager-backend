@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import TeacherAgenda from '@/components/TeacherAgenda';
@@ -17,94 +17,159 @@ import {
   DollarSign, 
   Star
 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 const TeacherDashboard = () => {
   const { user, logout } = useAuth();
   const [activeTab, setActiveTab] = useState('overview');
+  const [dashboardData, setDashboardData] = useState({
+    stats: [],
+    recentClasses: [],
+    students: []
+  });
+  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
 
-  const stats = [
-    {
-      title: 'Aulas este mês',
-      value: '32',
-      change: '+12%',
-      icon: <Calendar className="w-5 h-5 text-primary-500" />
-    },
-    {
-      title: 'Alunos ativos',
-      value: '18',
-      change: '+3',
-      icon: <Users className="w-5 h-5 text-secondary-500" />
-    },
-    {
-      title: 'Receita mensal',
-      value: 'R$ 2.840',
-      change: '+18%',
-      icon: <DollarSign className="w-5 h-5 text-accent-500" />
-    },
-    {
-      title: 'Avaliação média',
-      value: '4.9',
-      change: '+0.2',
-      icon: <Star className="w-5 h-5 text-yellow-500" />
+  useEffect(() => {
+    if (user?.id) {
+      fetchDashboardData();
     }
-  ];
+  }, [user?.id]);
 
-  const recentClasses = [
-    {
-      id: 1,
-      student: 'Ana Silva',
-      subject: 'Inglês Básico',
-      time: '09:00',
-      date: 'Hoje',
-      status: 'confirmed'
-    },
-    {
-      id: 2,
-      student: 'Carlos Santos',
-      subject: 'Matemática',
-      time: '14:30',
-      date: 'Hoje',
-      status: 'confirmed'
-    },
-    {
-      id: 3,
-      student: 'Maria Oliveira',
-      subject: 'Inglês Intermediário',
-      time: '16:00',
-      date: 'Amanhã',
-      status: 'pending'
-    }
-  ];
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true);
 
-  const students = [
-    {
-      id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
-      name: 'Ana Silva',
-      subject: 'Inglês',
-      level: 'Básico',
-      nextClass: '2024-12-24 09:00',
-      totalClasses: 12,
-      questions: 2
-    },
-    {
-      id: 'b2c3d4e5-f6g7-8901-bcde-f23456789012',
-      name: 'Carlos Santos',
-      subject: 'Matemática',
-      level: 'Intermediário',
-      nextClass: '2024-12-24 14:30',
-      totalClasses: 8,
-      questions: 0
-    },
-    {
-      id: 'c3d4e5f6-g7h8-9012-cdef-345678901234',
-      name: 'Maria Oliveira',
-      subject: 'Inglês',
-      level: 'Intermediário',
-      nextClass: '2024-12-25 16:00',
-      totalClasses: 15,
-      questions: 1
+      // Buscar alunos
+      const { data: alunos, error: alunosError } = await supabase
+        .from('alunos')
+        .select(`
+          id,
+          ativo,
+          profiles!inner(nome, email)
+        `)
+        .eq('professor_id', user?.id)
+        .eq('ativo', true);
+
+      if (alunosError) throw alunosError;
+
+      // Buscar aulas do mês atual
+      const mesAtual = new Date();
+      const primeiroDiaMes = new Date(mesAtual.getFullYear(), mesAtual.getMonth(), 1);
+      const ultimoDiaMes = new Date(mesAtual.getFullYear(), mesAtual.getMonth() + 1, 0);
+
+      const { data: aulas, error: aulasError } = await supabase
+        .from('aulas')
+        .select(`
+          id,
+          data_hora,
+          assunto,
+          status,
+          aluno_id,
+          profiles!aulas_aluno_id_fkey(nome)
+        `)
+        .eq('professor_id', user?.id)
+        .gte('data_hora', primeiroDiaMes.toISOString())
+        .lte('data_hora', ultimoDiaMes.toISOString())
+        .order('data_hora', { ascending: false });
+
+      if (aulasError) throw aulasError;
+
+      // Buscar dados financeiros
+      const { data: financeiro, error: financeiroError } = await supabase
+        .from('financeiro')
+        .select('*')
+        .eq('professor_id', user?.id);
+
+      if (financeiroError) throw financeiroError;
+
+      // Calcular estatísticas
+      const totalAlunos = alunos?.length || 0;
+      const totalAulas = aulas?.length || 0;
+      const receitaMensal = financeiro?.filter(f => f.status === 'pago').reduce((sum, f) => sum + f.valor, 0) || 0;
+
+      // Próximas aulas (hoje e amanhã)
+      const hoje = new Date();
+      const amanha = new Date(hoje);
+      amanha.setDate(hoje.getDate() + 1);
+
+             const proximasAulas = aulas?.filter(aula => {
+         const aulaData = new Date(aula.data_hora);
+         return aulaData >= hoje && aulaData <= amanha;
+       }).slice(0, 3).map(aula => ({
+         id: aula.id,
+         student: (aula as any).profiles?.nome || 'Aluno',
+         subject: aula.assunto || 'Aula',
+         time: new Date(aula.data_hora).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+         date: new Date(aula.data_hora).toDateString() === hoje.toDateString() ? 'Hoje' : 'Amanhã',
+         status: aula.status || 'agendada'
+       })) || [];
+
+      // Montar estatísticas
+      const stats = [
+        {
+          title: 'Aulas este mês',
+          value: totalAulas.toString(),
+          change: totalAulas > 0 ? `+${totalAulas}` : '0',
+          icon: <Calendar className="w-5 h-5 text-primary-500" />
+        },
+        {
+          title: 'Alunos ativos',
+          value: totalAlunos.toString(),
+          change: totalAlunos > 0 ? `+${totalAlunos}` : '0',
+          icon: <Users className="w-5 h-5 text-secondary-500" />
+        },
+        {
+          title: 'Receita mensal',
+          value: `R$ ${receitaMensal.toFixed(2)}`,
+          change: receitaMensal > 0 ? `+${((receitaMensal / 1000) * 100).toFixed(0)}%` : '0%',
+          icon: <DollarSign className="w-5 h-5 text-accent-500" />
+        },
+        {
+          title: 'Total de aulas',
+          value: totalAulas.toString(),
+          change: '0',
+          icon: <Star className="w-5 h-5 text-yellow-500" />
+        }
+      ];
+
+             // Montar lista de estudantes
+       const students = alunos?.map(aluno => ({
+         id: aluno.id,
+         name: (aluno as any).profiles?.nome || 'Aluno',
+         subject: 'Matéria', // Pode ser melhorado buscando das aulas
+         level: 'Nível',
+         nextClass: null,
+         totalClasses: aulas?.filter(a => a.aluno_id === aluno.id).length || 0,
+         questions: 0 // Pode ser melhorado buscando das dúvidas
+       })) || [];
+
+      setDashboardData({
+        stats,
+        recentClasses: proximasAulas,
+        students
+      });
+
+    } catch (error) {
+      console.error('Erro ao carregar dashboard:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível carregar os dados do dashboard",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -127,9 +192,9 @@ const TeacherDashboard = () => {
           </TabsList>
 
           <TabsContent value="overview" className="space-y-6">
-            <StatsCards stats={stats} />
+            <StatsCards stats={dashboardData.stats} />
             <QuickActions />
-            <RecentClasses classes={recentClasses} />
+            <RecentClasses classes={dashboardData.recentClasses} />
           </TabsContent>
 
           <TabsContent value="schedule" className="space-y-6">
@@ -140,7 +205,7 @@ const TeacherDashboard = () => {
           </TabsContent>
 
           <TabsContent value="students" className="space-y-6">
-            <StudentsGrid students={students} />
+            <StudentsGrid students={dashboardData.students} />
             <InvitesList />
           </TabsContent>
 

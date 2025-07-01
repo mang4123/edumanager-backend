@@ -16,7 +16,7 @@ import StudentRecordingsTab from '@/components/student-history/StudentRecordings
 
 interface Student {
   id: string;
-  profiles: { name: string }[];
+  profiles: { nome: string }[];
   nivel: string;
   observacoes: string;
   created_at: string;
@@ -101,7 +101,7 @@ const StudentHistory = () => {
       // Buscar dados do aluno
       const { data: studentData, error: studentError } = await supabase
         .from('alunos')
-        .select('*, profiles(name)')
+        .select('*, profiles(nome)')
         .eq('id', studentId)
         .single();
 

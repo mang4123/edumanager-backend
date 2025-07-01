@@ -50,7 +50,7 @@ const NewClassModal = ({ open, onOpenChange }: NewClassModalProps) => {
         .from('alunos')
         .select(`
           id,
-          profiles!inner(name)
+          profiles!inner(nome)
         `)
         .eq('professor_id', user.id)
         .eq('ativo', true);
@@ -148,7 +148,7 @@ const NewClassModal = ({ open, onOpenChange }: NewClassModalProps) => {
               <SelectContent>
                 {alunos.map((aluno) => (
                   <SelectItem key={aluno.id} value={aluno.id}>
-                    {aluno.profiles?.name}
+                    {aluno.profiles?.nome}
                   </SelectItem>
                 ))}
               </SelectContent>

@@ -1,5 +1,6 @@
 import { Router } from 'express';
-import { authenticateToken, requireRole } from '../middleware/auth';
+import { authenticateToken, requireRole, AuthRequest } from '../middleware/auth';
+import { supabaseAdmin } from '../config/supabase';
 
 const router = Router();
 
@@ -8,67 +9,124 @@ router.use(authenticateToken);
 router.use(requireRole(['professor'])); // Apenas professores têm acesso
 
 // Rota principal para dados financeiros (compatibilidade com frontend)
-router.get('/', (req, res) => {
-  res.json({ 
-    message: 'Dados financeiros', 
-    data: {
-      totalRecebido: 2400.00,
-      totalPendente: 800.00,
-      receitaMensal: 2400.00,
-      crescimento: 15,
-      alunosAtivos: 3,
-      aulasMes: 12,
-      pendencias: 1,
-      pagamentosRecentes: [
-        {
-          id: 1,
-          aluno: 'Ana Silva',
-          valor: 120.00,
-          data: '2024-01-15',
-          status: 'recebido'
-        },
-        {
-          id: 2,
-          aluno: 'Carlos Santos', 
-          valor: 150.00,
-          data: '2024-01-14',
-          status: 'recebido'
-        },
-        {
-          id: 3,
-          aluno: 'Maria Oliveira',
-          valor: 120.00,
-          data: '2024-01-13',
-          status: 'pendente'
-        }
-      ]
+router.get('/', async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.id;
+    
+    // Buscar dados financeiros reais
+    const { data: dadosFinanceiros, error } = await supabaseAdmin
+      .from('financeiro')
+      .select(`
+        *,
+        aluno:profiles!financeiro_aluno_id_fkey(nome)
+      `)
+      .eq('professor_id', userId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Erro ao buscar dados financeiros:', error);
+      throw error;
     }
-  });
+
+    const totalRecebido = dadosFinanceiros?.filter(d => d.status === 'pago').reduce((sum, d) => sum + (d.valor || 0), 0) || 0;
+    const totalPendente = dadosFinanceiros?.filter(d => d.status === 'pendente').reduce((sum, d) => sum + (d.valor || 0), 0) || 0;
+    
+    const pagamentosRecentes = dadosFinanceiros?.slice(0, 10).map(d => ({
+      id: d.id,
+      aluno: d.aluno?.nome || 'Aluno',
+      valor: d.valor,
+      data: d.created_at?.split('T')[0],
+      status: d.status
+    })) || [];
+
+    const crescimento = totalRecebido > 0 ? Math.round((totalRecebido / 1000) * 100) : 0;
+    const alunosAtivos = new Set(dadosFinanceiros?.map(d => d.aluno_id)).size;
+    const aulasMes = dadosFinanceiros?.filter(d => {
+      const dataTransacao = new Date(d.created_at || '');
+      const agora = new Date();
+      return dataTransacao.getMonth() === agora.getMonth() && 
+             dataTransacao.getFullYear() === agora.getFullYear();
+    }).length || 0;
+
+    res.json({ 
+      message: 'Dados financeiros', 
+      data: {
+        totalRecebido,
+        totalPendente,
+        receitaMensal: totalRecebido,
+        crescimento,
+        alunosAtivos,
+        aulasMes,
+        pendencias: dadosFinanceiros?.filter(d => d.status === 'pendente').length || 0,
+        pagamentosRecentes
+      }
+    });
+  } catch (error) {
+    console.error('Erro ao buscar dados financeiros:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
 });
 
 // Relatório financeiro detalhado
-router.get('/relatorio', (req, res) => {
-  res.json({ 
-    message: 'Relatório financeiro detalhado',
-    data: {
-      periodo: 'Janeiro 2024',
-      totalRecebido: 2400.00,
-      totalPendente: 800.00,
-      totalAulas: 12,
-      mediaAula: 100.00,
-      breakdown: {
-        semana1: 600.00,
-        semana2: 800.00,
-        semana3: 700.00,
-        semana4: 300.00
-      },
-      topAlunos: [
-        { nome: 'Carlos Santos', valor: 450.00, aulas: 4 },
-        { nome: 'Ana Silva', valor: 350.00, aulas: 3 },
-        { nome: 'Maria Oliveira', valor: 250.00, aulas: 2 }
-      ]
-    }
-  });
+router.get('/relatorio', async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.id;
+    
+    const { data: dadosFinanceiros, error } = await supabaseAdmin
+      .from('financeiro')
+      .select(`
+        *,
+        aluno:profiles!financeiro_aluno_id_fkey(nome)
+      `)
+      .eq('professor_id', userId)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    const totalRecebido = dadosFinanceiros?.filter(d => d.status === 'pago').reduce((sum, d) => sum + (d.valor || 0), 0) || 0;
+    const totalPendente = dadosFinanceiros?.filter(d => d.status === 'pendente').reduce((sum, d) => sum + (d.valor || 0), 0) || 0;
+    const totalAulas = dadosFinanceiros?.length || 0;
+    const mediaAula = totalAulas > 0 ? totalRecebido / totalAulas : 0;
+
+    // Agrupar por aluno
+    const alunosMap = new Map();
+    dadosFinanceiros?.forEach(d => {
+      const alunoNome = d.aluno?.nome || 'Aluno';
+      if (!alunosMap.has(alunoNome)) {
+        alunosMap.set(alunoNome, { nome: alunoNome, valor: 0, aulas: 0 });
+      }
+      const aluno = alunosMap.get(alunoNome);
+      if (d.status === 'pago') {
+        aluno.valor += d.valor || 0;
+      }
+      aluno.aulas += 1;
+    });
+
+    const topAlunos = Array.from(alunosMap.values())
+      .sort((a, b) => b.valor - a.valor)
+      .slice(0, 3);
+
+    res.json({ 
+      message: 'Relatório financeiro detalhado',
+      data: {
+        periodo: new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }),
+        totalRecebido,
+        totalPendente,
+        totalAulas,
+        mediaAula: Number(mediaAula.toFixed(2)),
+        breakdown: {
+          semana1: 0, // Pode ser implementado com lógica de semanas
+          semana2: 0,
+          semana3: 0,
+          semana4: 0
+        },
+        topAlunos
+      }
+    });
+  } catch (error) {
+    console.error('Erro ao buscar relatório financeiro:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
 });
 
 // Listar todos os pagamentos

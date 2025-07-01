@@ -1107,53 +1107,8 @@ router.get('/notificacoes', (req, res) => {
   });
 });
 
-// Estatísticas
-router.get('/stats', (req: AuthRequest, res) => {
-  res.json({
-    message: 'Estatísticas',
-    data: {
-      aulasTotal: 45,
-      alunosAtivos: 12,
-      exerciciosEnviados: 23,
-      taxaSucesso: 85,
-      receitaTotal: 2500.00,
-      crescimentoMensal: 15
-    }
-  });
-});
-
 // === ROTAS PARA DÚVIDAS ===
-// Lista de dúvidas em memória
-let duvidasMemoria: any[] = [
-  {
-    id: 1,
-    aluno: {
-      id: 1,
-      nome: 'Ana Silva',
-      foto: '/api/placeholder/32/32'
-    },
-    pergunta: 'Como resolver equações do segundo grau?',
-    materia: 'Matemática',
-    data: '2024-01-14',
-    status: 'pendente',
-    urgencia: 'normal'
-  },
-  {
-    id: 2,
-    aluno: {
-      id: 2,
-      nome: 'Carlos Santos',
-      foto: '/api/placeholder/32/32'
-    },
-    pergunta: 'Qual a diferença entre ser e estar?',
-    materia: 'Português',
-    data: '2024-01-13',
-    status: 'respondida',
-    resposta: 'Ser indica características permanentes, estar indica estados temporários.',
-    dataResposta: '2024-01-13',
-    urgencia: 'baixa'
-  }
-];
+// Dúvidas removidas - usar apenas dados reais do Supabase
 
 // Listar dúvidas dos alunos - BIDIRECIONAL
 router.get('/duvidas', (req: any, res) => {
@@ -1164,10 +1119,7 @@ router.get('/duvidas', (req: any, res) => {
     (duvida: any) => duvida.professorId === professorId
   );
   
-  // Adicionar as dúvidas padrão se não houver dúvidas específicas
-  if (duvidasProfessor.length === 0) {
-    duvidasProfessor.push(...duvidasMemoria);
-  }
+  // Dados removidos - usar apenas dúvidas reais do Supabase
   
   res.json({
     message: 'Dúvidas dos alunos',
@@ -1276,31 +1228,10 @@ router.post('/duvidas/:id/responder', (req: any, res) => {
     } else {
       console.log('❌ Dúvida não encontrada no sistema global, tentando dúvidas locais');
       
-      // Fallback para dúvidas locais
-      const duvidaLocalIndex = duvidasMemoria.findIndex(d => d.id.toString() === id.toString());
-      if (duvidaLocalIndex !== -1) {
-        console.log('✅ Dúvida encontrada nas dúvidas locais');
+      // Fallback removido - usar apenas dados reais do Supabase
+      console.log('❌ Dúvida não encontrada - usar apenas dados reais')
         
-        duvidasMemoria[duvidaLocalIndex] = {
-          ...duvidasMemoria[duvidaLocalIndex],
-          status: 'respondida',
-          resposta: resposta.trim(),
-          dataResposta: new Date().toISOString(),
-          professorId: professorId
-        };
-        
-        return res.json({
-          message: 'Dúvida respondida com sucesso',
-          data: {
-            duvidaId: id,
-            resposta: resposta.trim(),
-            dataResposta: new Date().toISOString(),
-            status: 'respondida',
-            notificacaoEnviada: false,
-            fonte: 'local'
-          }
-        });
-      } else {
+      {
         console.log('❌ Dúvida não encontrada, criando resposta genérica');
         
         // Criar resposta genérica para ID não encontrado
