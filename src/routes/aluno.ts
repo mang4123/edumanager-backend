@@ -137,14 +137,7 @@ router.get('/materiais', async (req, res) => {
     // 1. Buscar relacionamento aluno-professor
     const { data: alunoData, error: alunoError } = await supabaseAdmin
       .from('alunos')
-      .select(`
-        professor_id,
-        professor:profiles (
-          id,
-          nome,
-          email
-        )
-      `)
+      .select('professor_id')
       .eq('aluno_id', user.id)
       .eq('ativo', true)
       .single();
@@ -161,7 +154,30 @@ router.get('/materiais', async (req, res) => {
       });
     }
 
-    // 2. Buscar materiais/exercícios do professor
+    // 2. Buscar dados do professor
+    const { data: professorData, error: professorError } = await supabaseAdmin
+      .from('profiles')
+      .select('id, nome, email')
+      .eq('id', alunoData.professor_id)
+      .single();
+
+    if (professorError || !professorData) {
+      console.log('⚠️ [ALUNO] Erro ao buscar dados do professor:', professorError);
+      return res.json({
+        success: true,
+        message: "Erro ao buscar dados do professor",
+        data: {
+          professor: {
+            id: alunoData.professor_id,
+            nome: 'Professor',
+            email: null
+          },
+          materiais: []
+        }
+      });
+    }
+
+    // 3. Buscar materiais/exercícios do professor
     const { data: materiais, error: materiaisError } = await supabaseAdmin
       .from('exercicios')
       .select('*')
@@ -175,9 +191,9 @@ router.get('/materiais', async (req, res) => {
         message: "Erro ao buscar materiais",
         data: {
           professor: {
-            id: alunoData.professor_id,
-            nome: alunoData.professor?.nome || 'Professor',
-            email: alunoData.professor?.email
+            id: professorData.id,
+            nome: professorData.nome,
+            email: professorData.email
           },
           materiais: []
         }
@@ -191,9 +207,9 @@ router.get('/materiais', async (req, res) => {
       message: "Materiais do aluno",
       data: {
         professor: {
-          id: alunoData.professor_id,
-          nome: alunoData.professor?.nome || 'Professor',
-          email: alunoData.professor?.email
+          id: professorData.id,
+          nome: professorData.nome,
+          email: professorData.email
         },
         materiais: materiais || []
       }
