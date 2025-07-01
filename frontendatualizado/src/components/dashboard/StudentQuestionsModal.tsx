@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import {
@@ -22,7 +21,7 @@ interface Question {
   id: string;
   pergunta: string;
   resposta: string;
-  data_pergunta: string;
+  created_at: string;
   data_resposta: string;
   respondida: boolean;
 }
@@ -59,7 +58,7 @@ const StudentQuestionsModal = ({ open, onOpenChange, studentId, studentName }: S
         .select('*')
         .eq('aluno_id', studentId)
         .eq('professor_id', user.id)
-        .order('data_pergunta', { ascending: false });
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
       setQuestions(data || []);

@@ -1,4 +1,3 @@
-
 -- FASE 1: Tabela profiles (base do sistema)
 CREATE TABLE public.profiles (
   id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
@@ -67,7 +66,7 @@ CREATE TABLE public.duvidas (
   pergunta TEXT NOT NULL,
   resposta TEXT,
   respondida BOOLEAN NOT NULL DEFAULT false,
-  data_pergunta TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
   data_resposta TIMESTAMP WITH TIME ZONE
 );
 

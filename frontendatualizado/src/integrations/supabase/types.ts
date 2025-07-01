@@ -188,7 +188,7 @@ export type Database = {
       duvidas: {
         Row: {
           aluno_id: string
-          data_pergunta: string
+          created_at: string
           data_resposta: string | null
           id: string
           pergunta: string
@@ -198,7 +198,7 @@ export type Database = {
         }
         Insert: {
           aluno_id: string
-          data_pergunta?: string
+          created_at?: string
           data_resposta?: string | null
           id?: string
           pergunta: string
@@ -208,7 +208,7 @@ export type Database = {
         }
         Update: {
           aluno_id?: string
-          data_pergunta?: string
+          created_at?: string
           data_resposta?: string | null
           id?: string
           pergunta?: string

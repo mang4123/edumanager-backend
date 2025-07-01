@@ -1,4 +1,3 @@
-
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -7,7 +6,7 @@ interface Question {
   id: string;
   pergunta: string;
   resposta: string;
-  data_pergunta: string;
+  created_at: string;
   data_resposta: string;
   respondida: boolean;
 }

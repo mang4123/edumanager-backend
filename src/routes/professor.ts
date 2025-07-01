@@ -1528,46 +1528,65 @@ router.post('/convites', async (req: AuthRequest, res) => {
     const userId = req.user!.id;
     const { nome, email, observacoes, valor_aula, data_vencimento } = req.body;
 
-    // Verificar se o professor tem perfil, se não tiver, criar
-    const { data: professorProfile } = await supabaseAdmin
+    console.log('📝 Iniciando criação de convite para professor:', userId);
+
+    // 1. Verificar se o professor tem perfil
+    const { data: professorProfile, error: profileError } = await supabaseAdmin
       .from('profiles')
-      .select('id')
+      .select('*')
       .eq('id', userId)
       .single();
 
+    if (profileError) {
+      console.error('❌ Erro ao buscar perfil do professor:', profileError);
+      return res.status(500).json({
+        success: false,
+        error: 'Erro ao verificar perfil do professor',
+        details: profileError
+      });
+    }
+
+    // 2. Se não tiver perfil, criar
     if (!professorProfile) {
       console.log('⚠️ Professor sem perfil, criando...');
-      const { error: insertError } = await supabaseAdmin
+      
+      const { data: newProfile, error: insertError } = await supabaseAdmin
         .from('profiles')
         .insert({
           id: userId,
-          nome: req.user!.email?.split('@')[0] || 'Professor',
+          nome: req.user!.nome || req.user!.email?.split('@')[0] || 'Professor',
           email: req.user!.email,
           tipo: 'professor',
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
-        });
+        })
+        .select()
+        .single();
 
       if (insertError) {
         console.error('❌ Erro ao criar perfil do professor:', insertError);
         return res.status(500).json({
           success: false,
-          error: 'Erro ao criar perfil do professor'
+          error: 'Erro ao criar perfil do professor',
+          details: insertError
         });
       }
-      console.log('✅ Perfil do professor criado com sucesso');
+
+      console.log('✅ Perfil do professor criado com sucesso:', newProfile);
+    } else {
+      console.log('✅ Perfil do professor já existe:', professorProfile);
     }
 
-    // Gerar token único
+    // 3. Gerar token único
     const token = Math.random().toString(36).substring(2, 15) + 
                  Math.random().toString(36).substring(2, 15);
 
-    // Data de expiração (7 dias)
+    // 4. Data de expiração (7 dias)
     const expires_at = new Date();
     expires_at.setDate(expires_at.getDate() + 7);
 
-    // Criar convite
-    const { data: convite, error } = await supabaseAdmin
+    // 5. Criar convite
+    const { data: convite, error: conviteError } = await supabaseAdmin
       .from('convites')
       .insert({
         professor_id: userId,
@@ -1584,14 +1603,16 @@ router.post('/convites', async (req: AuthRequest, res) => {
       .select()
       .single();
 
-    if (error) {
-      console.error('❌ Erro ao criar convite:', error);
+    if (conviteError) {
+      console.error('❌ Erro ao criar convite:', conviteError);
       return res.status(400).json({
         success: false,
         error: 'Erro ao criar convite',
-        details: error
+        details: conviteError
       });
     }
+
+    console.log('✅ Convite criado com sucesso:', convite);
 
     return res.json({
       success: true,
@@ -1603,7 +1624,8 @@ router.post('/convites', async (req: AuthRequest, res) => {
     console.error('💥 Erro ao criar convite:', error);
     return res.status(500).json({
       success: false,
-      error: 'Erro interno do servidor'
+      error: 'Erro interno do servidor',
+      details: error instanceof Error ? error.message : 'Erro desconhecido'
     });
   }
 });

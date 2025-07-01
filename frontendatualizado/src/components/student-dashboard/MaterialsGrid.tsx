@@ -37,14 +37,14 @@ const MaterialsGrid = () => {
     try {
       setLoading(true);
 
-      // 1. Primeiro, descobrir qual professor está vinculado a este aluno
+      // 1. Buscar professor vinculado ao aluno
       const { data: alunoRelacao, error: alunoError } = await supabase
         .from('alunos')
         .select(`
           professor_id,
-          profiles!alunos_professor_id_fkey(nome)
+          professores(nome)
         `)
-        .eq('aluno_id', user?.id)
+        .eq('id', user?.id)
         .eq('ativo', true)
         .single();
 
@@ -58,7 +58,7 @@ const MaterialsGrid = () => {
       const professorId = alunoRelacao.professor_id;
       setProfessorInfo({
         id: professorId,
-        nome: (alunoRelacao as any).profiles?.nome || 'Professor'
+        nome: (alunoRelacao as any).professores?.nome || 'Professor'
       });
 
       // 2. Buscar materiais deste professor para este aluno

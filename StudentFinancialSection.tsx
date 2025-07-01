@@ -1,23 +1,12 @@
-/// <reference types="vite/client" />
-
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { DollarSign, Calendar, CreditCard, AlertCircle, CheckCircle } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { cn } from '@/lib/utils';
 
-declare global {
-  interface ImportMeta {
-    env: {
-      VITE_BACKEND_URL: string;
-    }
-  }
-}
-
-// Interface para os itens financeiros
 interface ItemFinanceiro {
   id: string;
   valor: number;
@@ -30,106 +19,97 @@ interface ItemFinanceiro {
   created_at: string;
 }
 
+interface Professor {
+  nome: string;
+}
+
+interface AlunoRelacao {
+  professor_id: string;
+  professor: Professor;
+}
+
+interface ResumoFinanceiro {
+  totalPendente: number;
+  totalPago: number;
+  itensPendentes: number;
+  itensPagos: number;
+}
+
 const StudentFinancialSection = () => {
   const [itensFinanceiros, setItensFinanceiros] = useState<ItemFinanceiro[]>([]);
   const [loading, setLoading] = useState(true);
   const [professorInfo, setProfessorInfo] = useState<{nome: string} | null>(null);
-  const [resumo, setResumo] = useState({
+  const [resumo, setResumo] = useState<ResumoFinanceiro>({
     totalPendente: 0,
     totalPago: 0,
     itensPendentes: 0,
     itensPagos: 0
   });
-  const { user, session } = useAuth();
+  const { user } = useAuth();
   const { toast } = useToast();
 
   useEffect(() => {
-    if (user?.id && session?.access_token) {
+    if (user?.id) {
       fetchDadosFinanceiros();
     }
-  }, [user?.id, session?.access_token]);
+  }, [user?.id]);
 
   const fetchDadosFinanceiros = async () => {
     try {
       setLoading(true);
 
-      if (!session?.access_token) {
-        toast({
-          title: "Erro de autenticação",
-          description: "Por favor, faça login novamente",
-          variant: "destructive",
-        });
+      // 1. Buscar professor vinculado ao aluno
+      const { data: alunoRelacao, error: alunoError } = await supabase
+        .from('alunos')
+        .select(`
+          professor_id,
+          profiles:professor_id(nome)
+        `)
+        .eq('aluno_id', user?.id)
+        .eq('ativo', true)
+        .single();
+
+      if (alunoError || !alunoRelacao) {
+        console.log('Aluno não vinculado a nenhum professor ainda');
+        setLoading(false);
         return;
       }
 
-      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'https://edumanager-backend-5olt.onrender.com';
-
-      // 1. Buscar perfil do aluno para verificar professor
-      const profileResponse = await fetch(`${backendUrl}/api/aluno/profile`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json'
-        }
+      const professorId = alunoRelacao.professor_id;
+      setProfessorInfo({
+        nome: alunoRelacao.profiles?.nome || 'Professor'
       });
 
-      if (!profileResponse.ok) {
-        throw new Error('Erro ao buscar perfil do aluno');
-      }
+      // 2. Buscar dados financeiros deste aluno com este professor
+      const { data: financeiroData, error: financeiroError } = await supabase
+        .from('financeiro')
+        .select('*')
+        .eq('aluno_id', user?.id)
+        .eq('professor_id', professorId)
+        .order('data_vencimento', { ascending: false });
 
-      const profileData = await profileResponse.json();
-      
-      if (profileData.success && profileData.data?.professor) {
-        setProfessorInfo({
-          nome: profileData.data.professor.nome || 'Professor'
-        });
-
-        // 2. Buscar dados financeiros do aluno
-        const financeiroResponse = await fetch(`${backendUrl}/api/aluno/financeiro`, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-            'Content-Type': 'application/json'
-          }
-        });
-
-        if (!financeiroResponse.ok) {
-          throw new Error('Erro ao buscar dados financeiros');
-        }
-
-        const financeiroData = await financeiroResponse.json();
-
-        if (financeiroData.success) {
-          const itens = financeiroData.data.itens || [];
-          setItensFinanceiros(itens);
-
-          // Calcular resumo
-          const totalPendente = itens
-            .filter(item => item.status === 'pendente')
-            .reduce((acc, item) => acc + (item.valor || 0), 0);
-
-          const totalPago = itens
-            .filter(item => item.status === 'pago')
-            .reduce((acc, item) => acc + (item.valor || 0), 0);
-
-          setResumo({
-            totalPendente,
-            totalPago,
-            itensPendentes: itens.filter(item => item.status === 'pendente').length,
-            itensPagos: itens.filter(item => item.status === 'pago').length
-          });
-        } else {
-          setItensFinanceiros([]);
-          setResumo({
-            totalPendente: 0,
-            totalPago: 0,
-            itensPendentes: 0,
-            itensPagos: 0
-          });
-        }
-      } else {
-        console.log('Aluno não vinculado a nenhum professor ainda');
+      if (financeiroError) {
+        console.log('Tabela financeiro pode não existir ainda:', financeiroError);
         setItensFinanceiros([]);
+      } else {
+        const itens = financeiroData || [];
+        setItensFinanceiros(itens);
+
+        // Calcular resumo
+        const totalPendente = itens
+          .filter(item => item.status === 'pendente')
+          .reduce((acc, item) => acc + (item.valor || 0), 0);
+
+        const totalPago = itens
+          .filter(item => item.status === 'pago')
+          .reduce((acc, item) => acc + (item.valor || 0), 0);
+
+        setResumo({
+          totalPendente,
+          totalPago,
+          itensPendentes: itens.filter(item => item.status === 'pendente').length,
+          itensPagos: itens.filter(item => item.status === 'pago').length
+        });
       }
 
     } catch (error: any) {
@@ -144,7 +124,7 @@ const StudentFinancialSection = () => {
     }
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: string): string => {
     switch (status) {
       case 'pago':
         return 'bg-green-100 text-green-800';
@@ -168,14 +148,14 @@ const StudentFinancialSection = () => {
     }
   };
 
-  const formatarMoeda = (valor: number) => {
+  const formatarMoeda = (valor: number): string => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL'
     }).format(valor);
   };
 
-  const formatarData = (data: string) => {
+  const formatarData = (data: string): string => {
     return new Date(data).toLocaleDateString('pt-BR');
   };
 
@@ -340,4 +320,4 @@ const StudentFinancialSection = () => {
   );
 };
 
-export default StudentFinancialSection;
+export default StudentFinancialSection; 

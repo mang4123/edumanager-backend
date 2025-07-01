@@ -1,4 +1,3 @@
-
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { CheckCircle, MessageSquare, Send } from 'lucide-react';
@@ -7,7 +6,7 @@ interface Question {
   id: string;
   pergunta: string;
   resposta: string;
-  data_pergunta: string;
+  created_at: string;
   data_resposta: string;
   respondida: boolean;
 }
@@ -30,7 +29,7 @@ const QuestionCard = ({ question, onRespond }: QuestionCardProps) => {
             {question.pergunta}
           </p>
           <p className="text-sm text-gray-500">
-            Pergunta feita em: {new Date(question.data_pergunta).toLocaleDateString('pt-BR')}
+            Pergunta feita em: {new Date(question.created_at).toLocaleDateString('pt-BR')}
           </p>
         </div>
         <Badge variant={question.respondida ? 'default' : 'secondary'}>

@@ -1,11 +1,10 @@
-
 import QuestionCard from './QuestionCard';
 
 interface Question {
   id: string;
   pergunta: string;
   resposta: string;
-  data_pergunta: string;
+  created_at: string;
   data_resposta: string;
   respondida: boolean;
 }

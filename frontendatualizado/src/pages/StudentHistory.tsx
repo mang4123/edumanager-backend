@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -35,7 +34,7 @@ interface Duvida {
   id: string;
   pergunta: string;
   resposta: string;
-  data_pergunta: string;
+  created_at: string;
   data_resposta: string;
   respondida: boolean;
 }
@@ -131,7 +130,8 @@ const StudentHistory = () => {
         .from('duvidas')
         .select('*')
         .eq('aluno_id', studentId)
-        .order('data_pergunta', { ascending: false });
+        .eq('professor_id', user.id)
+        .order('created_at', { ascending: false });
 
       if (duvidasError) {
         console.error('Error fetching duvidas:', duvidasError);

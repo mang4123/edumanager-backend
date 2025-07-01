@@ -1,11 +1,10 @@
-
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 interface Duvida {
   id: string;
   pergunta: string;
   resposta: string;
-  data_pergunta: string;
+  created_at: string;
   data_resposta: string;
   respondida: boolean;
 }
@@ -35,7 +34,7 @@ const StudentQuestionsTab = ({ duvidas }: StudentQuestionsTabProps) => {
                 </span>
               </div>
               <p className="text-sm text-gray-500 mb-2">
-                Pergunta em: {new Date(duvida.data_pergunta).toLocaleDateString('pt-BR')}
+                Pergunta em: {new Date(duvida.created_at).toLocaleDateString('pt-BR')}
               </p>
               {duvida.respondida && duvida.resposta && (
                 <div className="mt-3 p-3 bg-white rounded border">

@@ -14,8 +14,8 @@ interface UserProfile {
 interface AuthContextType {
   user: UserProfile | null;
   session: Session | null;
-  login: (email: string, password: string, type: 'teacher' | 'student') => Promise<boolean>;
-  register: (userData: Omit<UserProfile, 'id'> & { password: string }) => Promise<boolean>;
+  login: (email: string, password: string) => Promise<void>;
+  register: (email: string, password: string, name: string, type: 'teacher' | 'student') => Promise<void>;
   logout: () => Promise<void>;
   isAuthenticated: boolean;
   loading: boolean;
@@ -28,10 +28,47 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Criar perfil básico do usuário
+  const createAndEnsureUserProfile = async (authUser: User) => {
+    console.log('🏗️ Criando perfil básico para:', authUser.id);
+    console.log('📧 Email:', authUser.email);
+    console.log('📱 Metadata:', authUser.user_metadata);
+
+    const basicProfile: UserProfile = {
+      id: authUser.id,
+      name: authUser.user_metadata?.name || authUser.email?.split('@')[0] || 'Usuário',
+      email: authUser.email || '',
+      type: authUser.user_metadata?.type || 'student'
+    };
+
+    // Criar ou atualizar perfil no Supabase
+    const { data: profile, error } = await supabase
+      .from('profiles')
+      .upsert({
+        id: authUser.id,
+        nome: basicProfile.name,
+        email: basicProfile.email,
+        tipo: basicProfile.type,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('❌ Erro ao criar/atualizar perfil:', error);
+    } else {
+      console.log('✅ Perfil criado/atualizado no Supabase:', profile);
+    }
+
+    setUser(basicProfile);
+    console.log('✅ [CORRIGIDO] Definindo loading como false');
+  };
+
   // Inicializar autenticação
   useEffect(() => {
     let mounted = true;
-    console.log('🚀 AuthContext: Inicializando (VERSÃO SEM PROFILES)...');
+    console.log('🚀 AuthContext: Inicializando (VERSÃO CORRIGIDA)...');
 
     // Configurar listener de mudanças de auth
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -49,7 +86,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setUser(null);
         }
         
-        console.log('✅ Definindo loading como false');
+        console.log('✅ [CORRIGIDO] Definindo loading como false');
         setLoading(false);
       }
     );
@@ -68,12 +105,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (session?.user) {
           console.log('👤 Sessão existente, criando perfil básico...');
           await createAndEnsureUserProfile(session.user);
+          console.log('✅ [CORRIGIDO] Definindo loading como false (init)');
         } else {
           console.log('❌ Sem sessão');
           setUser(null);
         }
         
-        console.log('✅ Definindo loading como false (init)');
         setLoading(false);
         
       } catch (error) {
@@ -92,146 +129,56 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
   }, []);
 
-  const createAndEnsureUserProfile = async (authUser: User) => {
-    console.log('🏗️ Criando perfil básico para:', authUser.id);
-    console.log('📧 Email:', authUser.email);
-    console.log('📱 Metadata:', authUser.user_metadata);
-    
-    // Determinar tipo baseado no email ou metadata
-    let userType: 'teacher' | 'student' = 'teacher'; // default
-    
-    if (authUser.user_metadata?.user_type) {
-      userType = authUser.user_metadata.user_type;
-    } else if (authUser.email?.includes('aluno') || authUser.email?.includes('student')) {
-      userType = 'student';
-    }
-    
-    const profile: UserProfile = {
-      id: authUser.id,
-      name: authUser.user_metadata?.name || 
-            authUser.user_metadata?.full_name || 
-            authUser.email?.split('@')[0] || 
-            'Usuário',
-      email: authUser.email || '',
-      type: userType,
-      phone: authUser.user_metadata?.phone,
-      area: authUser.user_metadata?.area
-    };
-    
-    console.log('✅ Perfil básico criado:', profile);
-    setUser(profile);
-
-    // ✨ CORREÇÃO: Garantir que existe na tabela profiles para compatibilidade com backend
+  const login = async (email: string, password: string) => {
     try {
-      const { data: existingProfile, error: fetchError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', authUser.id)
-        .single();
-
-      if (fetchError && fetchError.code === 'PGRST116') {
-        // Perfil não existe, criar um
-        console.log('📝 Criando perfil na tabela profiles...');
-        const { error: insertError } = await supabase
-          .from('profiles')
-          .insert({
-            id: authUser.id,
-            name: profile.name,
-            email: profile.email,
-            user_type: userType,
-            phone: profile.phone
-          });
-
-        if (insertError) {
-          console.error('❌ Erro ao criar perfil:', insertError);
-        } else {
-          console.log('✅ Perfil criado na tabela profiles');
-        }
-      } else if (!fetchError) {
-        console.log('✅ Perfil já existe na tabela profiles');
-      }
-    } catch (error) {
-      console.error('💥 Erro ao verificar/criar perfil:', error);
-    }
-  };
-
-  const login = async (email: string, password: string, type: 'teacher' | 'student') => {
-    try {
-      console.log('🔐 Iniciando login para:', email, 'tipo:', type);
       setLoading(true);
-      
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password
       });
 
-      if (error) {
-        console.error('❌ Erro no login:', error);
-        setLoading(false);
-        return false;
-      }
+      if (error) throw error;
 
-      console.log('✅ Login bem-sucedido');
-      // Loading será definido como false pelo onAuthStateChange
-      return !!data.user;
     } catch (error) {
-      console.error('💥 Erro no login:', error);
+      throw error;
+    } finally {
       setLoading(false);
-      return false;
     }
   };
 
-  const register = async (userData: Omit<UserProfile, 'id'> & { password: string }) => {
+  const register = async (email: string, password: string, name: string, type: 'teacher' | 'student') => {
     try {
-      console.log('📝 Iniciando registro para:', userData.email);
       setLoading(true);
-      
       const { data, error } = await supabase.auth.signUp({
-        email: userData.email,
-        password: userData.password,
+        email,
+        password,
         options: {
-          emailRedirectTo: `${window.location.origin}/`,
           data: {
-            name: userData.name,
-            user_type: userData.type,
-            phone: userData.phone,
-            area: userData.area
+            name,
+            type
           }
         }
       });
 
-      if (error) {
-        console.error('❌ Erro no registro:', error);
-        setLoading(false);
-        return false;
-      }
+      if (error) throw error;
 
-      console.log('✅ Registro bem-sucedido');
-      setLoading(false);
-      return !!data.user;
     } catch (error) {
-      console.error('💥 Erro no registro:', error);
+      throw error;
+    } finally {
       setLoading(false);
-      return false;
     }
   };
 
   const logout = async () => {
     try {
-      console.log('🚪 Fazendo logout...');
       setLoading(true);
-      
       const { error } = await supabase.auth.signOut();
-      if (error) {
-        console.error('❌ Erro no logout:', error);
-      }
-      
+      if (error) throw error;
       setUser(null);
       setSession(null);
-      console.log('✅ Logout bem-sucedido');
-      setLoading(false);
     } catch (error) {
-      console.error('💥 Erro no logout:', error);
+      console.error('Erro ao fazer logout:', error);
+    } finally {
       setLoading(false);
     }
   };
@@ -267,3 +214,5 @@ export const useAuth = () => {
   }
   return context;
 };
+
+export default AuthContext;

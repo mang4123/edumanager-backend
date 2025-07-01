@@ -10,6 +10,7 @@ import studentRoutes from './routes/student';
 import { aulaRoutes } from './routes/aula';
 import { exercicioRoutes } from './routes/exercicio';
 import { financeiroRoutes } from './routes/financeiro';
+import { startJobScheduler } from './jobs/scheduler';
 
 import { authenticateToken, requireRole } from './middleware/auth';
 
@@ -286,12 +287,13 @@ app.use('*', (req, res) => {
   });
 });
 
-// === MIDDLEWARE DE TRATAMENTO DE ERROS ===
-app.use(errorHandler);
-
 // === INICIALIZAÇÃO DO SERVIDOR ===
 app.listen(PORT, () => {
-  console.log(`🚀 EduManager API rodando na porta ${PORT}`);
-  console.log(`📊 Health check: http://localhost:${PORT}/health`);
-  console.log(`🌍 Ambiente: ${process.env.NODE_ENV}`);
-}); 
+  console.log(`🚀 Servidor rodando na porta ${PORT}`);
+  
+  // Iniciar jobs de sincronização
+  startJobScheduler();
+});
+
+// Tratamento de erros global
+app.use(errorHandler); 

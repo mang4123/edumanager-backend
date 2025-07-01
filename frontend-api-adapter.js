@@ -16,6 +16,10 @@ class BackendClient {
 }
 
 class AuthService {
+  constructor() {
+    this._session = null;
+  }
+
   // Substitui supabase.auth.signUp()
   async signUp({ email, password, options = {} }) {
     try {
@@ -120,14 +124,14 @@ class AuthService {
       }
 
       const user = await response.json();
+      this._session = {
+        access_token: token,
+        user: user,
+        expires_at: Date.now() + 3600000 // 1 hora
+      };
       
       return {
-        data: {
-          session: {
-            access_token: token,
-            user: user,
-          }
-        },
+        data: { session: this._session },
         error: null
       };
     } catch (error) {
@@ -140,15 +144,21 @@ class AuthService {
     // Implementar listener básico
     const checkAuth = async () => {
       const { data } = await this.getSession();
-      callback('SIGNED_IN', data.session);
+      if (data.session) {
+        callback('SIGNED_IN', data.session);
+      } else {
+        callback('SIGNED_OUT', null);
+      }
     };
 
+    // Verificar a cada 5 minutos
+    const interval = setInterval(checkAuth, 300000);
     checkAuth();
 
     return {
       data: {
         subscription: {
-          unsubscribe: () => {}
+          unsubscribe: () => clearInterval(interval)
         }
       }
     };
@@ -173,124 +183,49 @@ class AuthService {
       return { data: { user: null }, error: { message: error.message } };
     }
   }
+
+  // Método para compatibilidade com v2
+  session() {
+    return this._session;
+  }
 }
 
 class TableService {
   constructor(table) {
     this.table = table;
-    this.query = {
-      columns: '*',
-      filters: [],
-      orders: [],
-      limits: null,
-    };
   }
 
-  // Substitui .select()
-  select(columns = '*') {
-    this.query.columns = columns;
-    return this;
-  }
-
-  // Substitui .eq()
-  eq(column, value) {
-    this.query.filters.push({ type: 'eq', column, value });
-    return this;
-  }
-
-  // Substitui .order()
-  order(column, options = {}) {
-    this.query.orders.push({ column, ...options });
-    return this;
-  }
-
-  // Substitui .limit()
-  limit(count) {
-    this.query.limits = count;
-    return this;
-  }
-
-  // Substitui .single()
-  async single() {
-    const result = await this.execute();
-    if (result.error) return result;
-    
-    return {
-      data: result.data?.[0] || null,
-      error: result.data?.length === 0 ? { message: 'No rows found' } : null
-    };
-  }
-
-  // Substitui .insert()
-  async insert(data) {
-    const token = localStorage.getItem('auth_token');
-    
+  async select(columns = '*') {
     try {
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`${API_BASE_URL}/api/${this.table}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      const data = await response.json();
+      return { data: data.data, error: null };
+    } catch (error) {
+      return { data: null, error };
+    }
+  }
+
+  async insert(values) {
+    try {
+      const token = localStorage.getItem('auth_token');
       const response = await fetch(`${API_BASE_URL}/api/${this.table}`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify(values),
       });
-
-      const result = await response.json();
-      
-      if (!response.ok) {
-        return { data: null, error: { message: result.error } };
-      }
-
-      return { data: result.data, error: null };
+      const data = await response.json();
+      return { data: data.data, error: null };
     } catch (error) {
-      return { data: null, error: { message: error.message } };
+      return { data: null, error };
     }
-  }
-
-  // Executa a query construída
-  async execute() {
-    const token = localStorage.getItem('auth_token');
-    
-    // Construir URL com query params
-    const params = new URLSearchParams();
-    
-    if (this.query.columns !== '*') {
-      params.append('select', this.query.columns);
-    }
-    
-    this.query.filters.forEach(filter => {
-      params.append(`${filter.column}`, `${filter.type}.${filter.value}`);
-    });
-    
-    if (this.query.limits) {
-      params.append('limit', this.query.limits);
-    }
-
-    try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/${this.table}?${params.toString()}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-        }
-      );
-
-      const result = await response.json();
-      
-      if (!response.ok) {
-        return { data: null, error: { message: result.error } };
-      }
-
-      return { data: result.data, error: null };
-    } catch (error) {
-      return { data: null, error: { message: error.message } };
-    }
-  }
-
-  // Método padrão para buscar dados
-  then(callback) {
-    return this.execute().then(callback);
   }
 }
 

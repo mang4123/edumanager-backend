@@ -1,14 +1,11 @@
-/// <reference types="vite/client" />
-
-/// <reference types="vite/client" />
-
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { MessageSquare, Send, HelpCircle } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 
@@ -31,83 +28,61 @@ const QuestionsSection = () => {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [professorInfo, setProfessorInfo] = useState<{id: string, nome: string} | null>(null);
-  const { user, session } = useAuth();
+  const { user } = useAuth();
   const { toast } = useToast();
 
   useEffect(() => {
-    if (user?.id && session?.access_token) {
+    if (user?.id) {
       fetchQuestions();
     }
-  }, [user?.id, session?.access_token]);
+  }, [user?.id]);
 
   const fetchQuestions = async () => {
     try {
       setLoading(true);
 
-      if (!session?.access_token) {
-        toast({
-          title: "Erro de autenticação",
-          description: "Por favor, faça login novamente",
-          variant: "destructive",
-        });
+      // 1. Primeiro, descobrir qual professor está vinculado a este aluno
+      const { data: alunoRelacao, error: alunoError } = await supabase
+        .from('alunos')
+        .select(`
+          professor_id,
+          profiles:professor_id(nome)
+        `)
+        .eq('aluno_id', user?.id)
+        .eq('ativo', true)
+        .single();
+
+      if (alunoError || !alunoRelacao) {
+        console.log('Aluno não vinculado a nenhum professor ainda');
+        setQuestions([]);
+        setLoading(false);
         return;
       }
 
-      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'https://edumanager-backend-5olt.onrender.com';
-
-      // 1. Buscar perfil do aluno para verificar professor
-      const profileResponse = await fetch(`${backendUrl}/api/aluno/profile`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json'
-        }
+      const professorId = alunoRelacao.professor_id;
+      setProfessorInfo({
+        id: professorId,
+        nome: alunoRelacao.profiles?.nome || 'Professor'
       });
 
-      if (!profileResponse.ok) {
-        throw new Error('Erro ao buscar perfil do aluno');
-      }
+      // 2. Buscar dúvidas deste aluno com este professor
+      const { data: duvidasData, error: duvidasError } = await supabase
+        .from('duvidas')
+        .select('*')
+        .eq('aluno_id', user?.id)
+        .eq('professor_id', professorId)
+        .order('created_at', { ascending: false });
 
-      const profileData = await profileResponse.json();
-      
-      if (profileData.success && profileData.data?.professor) {
-        setProfessorInfo({
-          id: profileData.data.professor.id,
-          nome: profileData.data.professor.nome || 'Professor'
-        });
-
-        // 2. Buscar dúvidas do aluno via backend
-        const duvidasResponse = await fetch(`${backendUrl}/api/aluno/duvidas`, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-            'Content-Type': 'application/json'
-          }
-        });
-
-        if (!duvidasResponse.ok) {
-          throw new Error('Erro ao buscar dúvidas');
-        }
-
-        const duvidasData = await duvidasResponse.json();
-
-        if (duvidasData.success) {
-          setQuestions(duvidasData.data.duvidas || []);
-        } else {
-          setQuestions([]);
-        }
-      } else {
-        console.log('Aluno não vinculado a nenhum professor ainda');
+      if (duvidasError) {
+        // Se a tabela não existir ou der erro, continua sem dúvidas
+        console.log('Tabela duvidas pode não existir ainda:', duvidasError);
         setQuestions([]);
+      } else {
+        setQuestions(duvidasData || []);
       }
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao buscar dúvidas:', error);
-      toast({
-        title: "Erro ao carregar dúvidas",
-        description: "Tente novamente em alguns instantes",
-        variant: "destructive",
-      });
     } finally {
       setLoading(false);
     }
@@ -134,58 +109,38 @@ const QuestionsSection = () => {
       return;
     }
 
-    if (!session?.access_token) {
-      toast({
-        title: "Erro de autenticação",
-        description: "Por favor, faça login novamente",
-        variant: "destructive",
-      });
-      return;
-    }
-
     try {
       setSubmitting(true);
 
-      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'https://edumanager-backend-5olt.onrender.com';
-      
-      const response = await fetch(`${backendUrl}/api/aluno/duvidas`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
+      const { error } = await supabase
+        .from('duvidas')
+        .insert([{
+          aluno_id: user?.id,
+          professor_id: professorInfo.id,
           pergunta: newQuestion.trim(),
-          assunto: questionSubject.trim() || 'Geral'
-        })
+          respondida: false,
+          assunto: questionSubject.trim() || null
+        }]);
+
+      if (error) {
+        throw error;
+      }
+
+      toast({
+        title: "Dúvida enviada!",
+        description: `Sua pergunta foi enviada para ${professorInfo.nome}`,
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Erro ao enviar dúvida');
-      }
-
-      const data = await response.json();
-      
-      if (data.success) {
-        toast({
-          title: "Dúvida enviada!",
-          description: `Sua pergunta foi enviada para ${professorInfo.nome}`,
-        });
-
-        // Limpar formulário e recarregar dúvidas
-        setNewQuestion('');
-        setQuestionSubject('');
-        await fetchQuestions();
-      } else {
-        throw new Error(data.message || 'Erro ao enviar dúvida');
-      }
+      // Limpar formulário e recarregar dúvidas
+      setNewQuestion('');
+      setQuestionSubject('');
+      await fetchQuestions();
 
     } catch (error: any) {
       console.error('Erro ao enviar dúvida:', error);
       toast({
         title: "Erro ao enviar dúvida",
-        description: error.message || "Tente novamente em alguns instantes",
+        description: "Tente novamente em alguns instantes",
         variant: "destructive",
       });
     } finally {
@@ -331,4 +286,4 @@ const QuestionsSection = () => {
   );
 };
 
-export default QuestionsSection;
+export default QuestionsSection; 
