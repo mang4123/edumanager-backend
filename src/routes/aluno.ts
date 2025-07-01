@@ -17,33 +17,27 @@ router.get('/profile', async (req, res) => {
       return res.status(401).json({ error: 'Usuário não autenticado' });
     }
 
-    // Buscar dados reais do aluno
+    // Buscar dados reais do aluno - Query SIMPLIFICADA
     const { data: alunoData, error: alunoError } = await supabaseAdmin
-      .from('profiles')
+      .from('alunos')
       .select(`
-        *,
-        alunos!inner(
-          professor_id,
-          ativo,
-          professor:profiles!alunos_professor_id_fkey(nome, email, telefone)
-        )
+        id,
+        professor_id,
+        ativo,
+        aluno_id
       `)
-      .eq('id', user.id)
-      .eq('tipo', 'aluno')
+      .eq('aluno_id', user.id)
       .single();
 
     if (alunoError || !alunoData) {
+      console.log('❌ Aluno não vinculado a nenhum professor ainda');
       // Se não encontrar dados reais, retornar estrutura básica
       const aluno = {
         id: user.id,
         nome: user.nome || 'Aluno',
         email: user.email,
         telefone: user.telefone || null,
-        professor: {
-          nome: "Sem professor atribuído",
-          especialidade: "N/A",
-          telefone: null
-        },
+        professor: null, // NULL = não vinculado
         estatisticas: {
           aulasRealizadas: 0,
           exerciciosPendentes: 0,
@@ -53,22 +47,28 @@ router.get('/profile', async (req, res) => {
       };
 
       return res.json({
-        message: "Perfil do aluno",
+        message: "Perfil do aluno (não vinculado)",
         data: aluno
       });
     }
 
-    // Buscar estatísticas reais se existir dados
+    // Se chegou aqui, o aluno ESTÁ vinculado - buscar dados do professor
+    const { data: professorData, error: profError } = await supabaseAdmin
+      .from('profiles')
+      .select('nome, email, telefone')
+      .eq('id', alunoData.professor_id)
+      .single();
+
     const aluno = {
       id: user.id,
-      nome: alunoData.nome,
-      email: alunoData.email,
-      telefone: alunoData.telefone,
-      professor: {
-        nome: alunoData.alunos[0]?.professor?.nome || "Professor",
-        especialidade: alunoData.alunos[0]?.professor?.especialidade || "Ensino",
-        telefone: alunoData.alunos[0]?.professor?.telefone
-      },
+      nome: user.nome || 'Aluno',
+      email: user.email,
+      telefone: user.telefone || null,
+      professor: professorData ? {
+        nome: professorData.nome || "Professor",
+        especialidade: "Ensino",
+        telefone: professorData.telefone
+      } : null,
       estatisticas: {
         aulasRealizadas: 0,
         exerciciosPendentes: 0,
