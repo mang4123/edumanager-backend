@@ -139,7 +139,7 @@ router.get('/materiais', async (req, res) => {
       .from('alunos')
       .select(`
         professor_id,
-        professor:profiles!professor_id (
+        professor:profiles (
           id,
           nome,
           email
