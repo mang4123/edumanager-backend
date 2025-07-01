@@ -1226,28 +1226,17 @@ router.post('/duvidas/:id/responder', (req: any, res) => {
       });
       
     } else {
-      console.log('❌ Dúvida não encontrada no sistema global, tentando dúvidas locais');
+      console.log('❌ Dúvida não encontrada no sistema global');
       
-      // Fallback removido - usar apenas dados reais do Supabase
-      console.log('❌ Dúvida não encontrada - usar apenas dados reais')
-        
-      {
-        console.log('❌ Dúvida não encontrada, criando resposta genérica');
-        
-        // Criar resposta genérica para ID não encontrado
-        return res.json({
-          message: 'Resposta salva com sucesso',
-          data: {
-            duvidaId: id,
-            resposta: resposta.trim(),
-            dataResposta: new Date().toISOString(),
-            status: 'respondida',
-            notificacaoEnviada: false,
-            fonte: 'generica',
-            observacao: 'Dúvida não encontrada no sistema, mas resposta foi registrada'
-          }
-        });
-      }
+      // Retornar erro se não encontrou a dúvida
+      return res.status(404).json({
+        message: 'Dúvida não encontrada',
+        error: 'DUVIDA_NAO_ENCONTRADA',
+        data: {
+          duvidaId: id,
+          observacao: 'Use apenas dados reais do sistema'
+        }
+      });
     }
   } catch (error) {
     console.error('❌ ERRO ao responder dúvida:', error);

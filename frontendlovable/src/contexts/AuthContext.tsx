@@ -1,4 +1,3 @@
-
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -38,10 +37,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setSession(session);
         
         if (session?.user) {
-          // Buscar perfil do usuário
-          setTimeout(async () => {
-            await loadUserProfile(session.user.id);
-          }, 0);
+          // Buscar perfil do usuário SEM setTimeout
+          await loadUserProfile(session.user.id);
         } else {
           setUser(null);
         }
@@ -64,32 +61,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const loadUserProfile = async (userId: string) => {
     try {
+      // Query SIMPLES sem JOIN problemático
       const { data: profile, error } = await supabase
         .from('profiles')
-        .select(`
-          *,
-          professores(area)
-        `)
+        .select('id, nome, email, user_type, telefone')
         .eq('id', userId)
         .single();
 
       if (error) {
         console.error('Erro ao carregar perfil:', error);
+        setLoading(false);
         return;
       }
 
       if (profile) {
         setUser({
           id: profile.id,
-          name: profile.name,
+          name: profile.nome || profile.email,
           email: profile.email,
           type: profile.user_type as 'teacher' | 'student',
-          area: profile.professores?.[0]?.area,
-          phone: profile.phone
+          phone: profile.telefone
         });
       }
+      setLoading(false);
     } catch (error) {
       console.error('Erro ao carregar perfil:', error);
+      setLoading(false);
     }
   };
 
