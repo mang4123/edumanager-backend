@@ -100,7 +100,28 @@ export const authenticateToken = async (
       } else {
         console.log('⚠️ [AUTH] Perfil não encontrado, criando automaticamente...');
         
-        // CRIAR PERFIL AUTOMATICAMENTE
+        // 🎯 VERIFICAR SE HÁ CONVITE PENDENTE PARA ESTE EMAIL
+        let professorId = null;
+        try {
+          const { data: convitesPendentes } = await supabaseAdmin
+            .from('convites')
+            .select('professor_id, token, nome')
+            .eq('email', userEmail)
+            .eq('usado', false)
+            .gte('expires_at', new Date().toISOString())
+            .order('created_at', { ascending: false })
+            .limit(1);
+
+          if (convitesPendentes && convitesPendentes.length > 0) {
+            professorId = convitesPendentes[0].professor_id;
+            console.log('🎉 [AUTH] CONVITE ENCONTRADO! Vinculando ao professor:', professorId);
+            userType = 'aluno'; // Se tem convite, é aluno
+          }
+        } catch (conviteError) {
+          console.log('⚠️ [AUTH] Erro ao verificar convites (não crítico):', conviteError);
+        }
+
+        // CRIAR PERFIL AUTOMATICAMENTE (com vinculação se houver convite)
         const { data: newProfile, error: createError } = await supabaseAdmin
           .from('profiles')
           .insert({
@@ -109,6 +130,7 @@ export const authenticateToken = async (
             email: userEmail,
             tipo: userType,
             user_type: userType,
+            professor_id: professorId, // 🎯 VINCULAÇÃO AUTOMÁTICA VIA CONVITE!
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
           })
@@ -121,6 +143,45 @@ export const authenticateToken = async (
         } else {
           console.log('✅ [AUTH] Perfil criado automaticamente:', newProfile);
           profileData = newProfile;
+
+          // 🎯 SE VINCULOU VIA CONVITE, CRIAR RELACIONAMENTO NA TABELA ALUNOS
+          if (professorId && userType === 'aluno') {
+            try {
+              const { data: relacionamento, error: relError } = await supabaseAdmin
+                .from('alunos')
+                .insert({
+                  aluno_id: userId,
+                  professor_id: professorId,
+                  ativo: true,
+                  created_at: new Date().toISOString(),
+                  updated_at: new Date().toISOString()
+                })
+                .select()
+                .single();
+
+              if (relError) {
+                console.error('❌ [AUTH] Erro ao criar relacionamento aluno-professor:', relError);
+              } else {
+                console.log('✅ [AUTH] Relacionamento aluno-professor criado automaticamente:', relacionamento);
+              }
+
+              // MARCAR CONVITE COMO USADO
+              await supabaseAdmin
+                .from('convites')
+                .update({
+                  usado: true,
+                  usado_em: new Date().toISOString(),
+                  aluno_id: userId,
+                  updated_at: new Date().toISOString()
+                })
+                .eq('email', userEmail)
+                .eq('usado', false);
+
+              console.log('🎉 [AUTH] VINCULAÇÃO AUTOMÁTICA CONCLUÍDA COM SUCESSO!');
+            } catch (relacionamentoError) {
+              console.error('⚠️ [AUTH] Erro no relacionamento (não crítico):', relacionamentoError);
+            }
+          }
         }
       }
     } catch (profileError) {
