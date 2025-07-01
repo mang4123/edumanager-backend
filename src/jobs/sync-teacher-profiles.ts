@@ -35,14 +35,18 @@ export async function syncTeacherProfiles() {
             id: teacher.id,
             nome: teacher.user_metadata?.name || teacher.email?.split('@')[0] || 'Professor',
             email: teacher.email,
-            tipo: 'teacher',
+            tipo: 'professor',
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
           });
 
         if (insertError) {
           console.error(`❌ Erro ao criar perfil para ${teacher.email}:`, insertError);
+        } else {
+          console.log(`✅ Perfil criado com sucesso para ${teacher.email}`);
         }
+      } else {
+        console.log(`✅ Perfil já existe para: ${teacher.email}`);
       }
     }
 
