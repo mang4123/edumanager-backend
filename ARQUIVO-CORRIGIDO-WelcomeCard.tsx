@@ -12,12 +12,14 @@ const WelcomeCard = ({ userName }: WelcomeCardProps) => {
   const { user, session } = useAuth();
   const [teacherInfo, setTeacherInfo] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [hasChecked, setHasChecked] = useState(false);
 
   useEffect(() => {
-    if (user?.id && session) {
+    // PROTEÇÃO ANTI-LOOP: só executa se tem user, session e ainda não checou
+    if (user?.id && session && !hasChecked) {
       checkTeacherConnection();
     }
-  }, [user?.id, session]);
+  }, [user?.id, session, hasChecked]);
 
   // CORREÇÃO: Função para obter token corretamente
   const getAuthToken = async () => {
@@ -32,46 +34,62 @@ const WelcomeCard = ({ userName }: WelcomeCardProps) => {
 
   const checkTeacherConnection = async () => {
     try {
-      console.log('🔍 Verificando vinculação do aluno:', user?.id);
+      console.log('🔍 [WelcomeCard] Verificando vinculação do aluno:', user?.id);
+      setHasChecked(true); // PROTEÇÃO: marca que já tentou verificar
       
       // CORREÇÃO: Obter token corretamente
       const token = await getAuthToken();
       
       if (!token) {
-        console.error('Token não encontrado');
+        console.error('[WelcomeCard] Token não encontrado');
         setLoading(false);
         return;
       }
 
-      // CORREÇÃO: URL completa do backend
+      // CORREÇÃO: URL ABSOLUTA obrigatória - NUNCA relativa
       const backendUrl = import.meta.env.VITE_BACKEND_URL || 'https://edumanager-backend-5olt.onrender.com';
+      const fullUrl = `${backendUrl}/api/aluno/profile`;
       
-      const response = await fetch(`${backendUrl}/api/aluno/profile`, {
+      console.log('🌐 [WelcomeCard] Fazendo fetch para:', fullUrl);
+      
+      const response = await fetch(fullUrl, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
         }
       });
       
+      console.log('📡 [WelcomeCard] Status da resposta:', response.status);
+      
       if (response.ok) {
         const data = await response.json();
-        console.log('📊 Resposta do backend:', data);
+        console.log('📊 [WelcomeCard] Dados recebidos:', data);
         
-        // CORREÇÃO: Verificar estrutura de dados correta
+        // CORREÇÃO: Verificar múltiplas estruturas possíveis
         if (data.success && data.data?.professor) {
           setTeacherInfo(data.data.professor);
+          console.log('✅ [WelcomeCard] Professor encontrado via data.data.professor');
         } else if (data.data?.professor) {
-          // Fallback caso não tenha 'success' mas tenha dados
           setTeacherInfo(data.data.professor);
+          console.log('✅ [WelcomeCard] Professor encontrado via data.professor (fallback)');
+        } else if (data.professor) {
+          setTeacherInfo(data.professor);
+          console.log('✅ [WelcomeCard] Professor encontrado via data.professor direto');
+        } else {
+          console.log('ℹ️ [WelcomeCard] Nenhum professor vinculado');
         }
       } else {
-        console.error('Erro na resposta:', response.status, response.statusText);
+        console.error('[WelcomeCard] Erro na resposta:', response.status, response.statusText);
+        if (response.status === 404) {
+          console.log('ℹ️ [WelcomeCard] 404 - Aluno não vinculado (normal)');
+        }
       }
       
-      setLoading(false);
     } catch (error) {
-      console.error('💥 Erro ao verificar vinculação:', error);
+      console.error('💥 [WelcomeCard] Erro ao verificar vinculação:', error);
+    } finally {
       setLoading(false);
     }
   };

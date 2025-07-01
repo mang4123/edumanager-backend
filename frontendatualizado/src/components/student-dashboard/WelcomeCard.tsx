@@ -149,4 +149,4 @@ const WelcomeCard = ({ userName }: WelcomeCardProps) => {
   );
 };
 
-export default WelcomeCard; 
+export default WelcomeCard;
