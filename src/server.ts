@@ -125,8 +125,15 @@ function enviarNotificacaoSMS(telefone: string, mensagem: string) {
 
 // === MIDDLEWARE BÁSICO ===
 app.use(cors({
-  origin: true,
-  credentials: true
+  origin: [
+    'https://preview--tutor-class-hub.lovable.app',
+    'https://tutor-class-hub.lovable.app',
+    'http://localhost:3000',
+    'http://localhost:5173'
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
 
 app.use(helmet());
