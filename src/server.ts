@@ -159,7 +159,7 @@ app.get('/health', (req, res) => {
 // === ROTAS PRINCIPAIS ===
 // app.use('/api/auth', authRoutes); // Removido - usando Supabase Auth diretamente
 app.use('/api/professor', authenticateToken, requireRole(['professor']), professorRoutes);
-app.use('/api/aluno', authenticateToken, requireRole(['aluno']), alunoRoutes);
+app.use('/api/aluno', alunoRoutes);
 app.use('/api/student', studentRoutes);
 app.use('/api/aula', aulaRoutes);
 app.use('/api/exercicio', authenticateToken, exercicioRoutes);

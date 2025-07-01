@@ -4,7 +4,7 @@ import { authenticateToken, requireRole, AuthRequest } from '../middleware/auth'
 
 const router = Router();
 
-// Aplicar autenticação em todas as rotas
+// Aplicar autenticação em todas as rotas (sem restrição de role)
 router.use(authenticateToken);
 
 // ==========================================
