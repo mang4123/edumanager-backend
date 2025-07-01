@@ -1522,4 +1522,90 @@ router.post('/agenda/nova-aula', (req: AuthRequest, res) => {
   });
 });
 
+// Criar convite
+router.post('/convites', async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.id;
+    const { nome, email, observacoes, valor_aula, data_vencimento } = req.body;
+
+    // Verificar se o professor tem perfil, se não tiver, criar
+    const { data: professorProfile } = await supabaseAdmin
+      .from('profiles')
+      .select('id')
+      .eq('id', userId)
+      .single();
+
+    if (!professorProfile) {
+      console.log('⚠️ Professor sem perfil, criando...');
+      const { error: insertError } = await supabaseAdmin
+        .from('profiles')
+        .insert({
+          id: userId,
+          nome: req.user!.email?.split('@')[0] || 'Professor',
+          email: req.user!.email,
+          tipo: 'professor',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
+
+      if (insertError) {
+        console.error('❌ Erro ao criar perfil do professor:', insertError);
+        return res.status(500).json({
+          success: false,
+          error: 'Erro ao criar perfil do professor'
+        });
+      }
+      console.log('✅ Perfil do professor criado com sucesso');
+    }
+
+    // Gerar token único
+    const token = Math.random().toString(36).substring(2, 15) + 
+                 Math.random().toString(36).substring(2, 15);
+
+    // Data de expiração (7 dias)
+    const expires_at = new Date();
+    expires_at.setDate(expires_at.getDate() + 7);
+
+    // Criar convite
+    const { data: convite, error } = await supabaseAdmin
+      .from('convites')
+      .insert({
+        professor_id: userId,
+        nome,
+        email,
+        token,
+        observacoes,
+        valor_aula,
+        data_vencimento,
+        expires_at: expires_at.toISOString(),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('❌ Erro ao criar convite:', error);
+      return res.status(400).json({
+        success: false,
+        error: 'Erro ao criar convite',
+        details: error
+      });
+    }
+
+    return res.json({
+      success: true,
+      data: convite,
+      message: 'Convite criado com sucesso'
+    });
+
+  } catch (error) {
+    console.error('💥 Erro ao criar convite:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Erro interno do servidor'
+    });
+  }
+});
+
 export { router as professorRoutes }; 
