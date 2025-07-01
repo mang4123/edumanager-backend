@@ -137,7 +137,14 @@ router.get('/materiais', async (req, res) => {
     // 1. Buscar relacionamento aluno-professor
     const { data: alunoData, error: alunoError } = await supabaseAdmin
       .from('alunos')
-      .select('professor_id')
+      .select(`
+        professor_id,
+        profiles:profiles!alunos_professor_id_fkey (
+          id,
+          nome,
+          email
+        )
+      `)
       .eq('aluno_id', user.id)
       .eq('ativo', true)
       .single();
@@ -147,7 +154,10 @@ router.get('/materiais', async (req, res) => {
       return res.json({
         success: true,
         message: "Aluno não vinculado a professor",
-        data: []
+        data: {
+          professor: null,
+          materiais: []
+        }
       });
     }
 
@@ -162,8 +172,15 @@ router.get('/materiais', async (req, res) => {
       console.log('⚠️ [ALUNO] Erro ao buscar materiais:', materiaisError);
       return res.json({
         success: true,
-        message: "Nenhum material encontrado",
-        data: []
+        message: "Erro ao buscar materiais",
+        data: {
+          professor: {
+            id: alunoData.professor_id,
+            nome: alunoData.profiles?.nome || 'Professor',
+            email: alunoData.profiles?.email
+          },
+          materiais: []
+        }
       });
     }
 
@@ -172,7 +189,14 @@ router.get('/materiais', async (req, res) => {
     return res.json({
       success: true,
       message: "Materiais do aluno",
-      data: materiais || []
+      data: {
+        professor: {
+          id: alunoData.professor_id,
+          nome: alunoData.profiles?.nome || 'Professor',
+          email: alunoData.profiles?.email
+        },
+        materiais: materiais || []
+      }
     });
 
   } catch (error) {
