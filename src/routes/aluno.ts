@@ -139,7 +139,7 @@ router.get('/materiais', async (req, res) => {
       .from('alunos')
       .select(`
         professor_id,
-        profiles:profiles!alunos_professor_id_fkey (
+        professor:profiles!professor_id (
           id,
           nome,
           email
@@ -176,8 +176,8 @@ router.get('/materiais', async (req, res) => {
         data: {
           professor: {
             id: alunoData.professor_id,
-            nome: alunoData.profiles?.nome || 'Professor',
-            email: alunoData.profiles?.email
+            nome: alunoData.professor?.nome || 'Professor',
+            email: alunoData.professor?.email
           },
           materiais: []
         }
@@ -192,8 +192,8 @@ router.get('/materiais', async (req, res) => {
       data: {
         professor: {
           id: alunoData.professor_id,
-          nome: alunoData.profiles?.nome || 'Professor',
-          email: alunoData.profiles?.email
+          nome: alunoData.professor?.nome || 'Professor',
+          email: alunoData.professor?.email
         },
         materiais: materiais || []
       }
