@@ -61,24 +61,60 @@ export const authenticateToken = async (
       throw createError('Token inválido ou expirado: ' + jwtError.message, 401);
     }
 
-    // 🔥 CORREÇÃO: NÃO DEPENDER da tabela profiles
+    // 🔥 CORREÇÃO: VERIFICAR CONVITES ANTES DE DETERMINAR TIPO
     // Determinar tipo baseado no email e metadata diretamente
     let userType: 'professor' | 'aluno' = 'professor'; // default
+    let professorIdDoConvite = null;
     
-    if (userMetadata.user_type) {
-      userType = userMetadata.user_type === 'teacher' ? 'professor' : 'aluno';
-    } else if (userMetadata.type) {
-      userType = userMetadata.type === 'teacher' ? 'professor' : 'aluno';
-    } else if (userEmail?.includes('aluno') || userEmail?.includes('student')) {
-      userType = 'aluno';
-    } else if (userEmail?.includes('prof') || userEmail?.includes('teacher')) {
-      userType = 'professor';
+    // 🎯 PRIMEIRO: VERIFICAR SE HÁ CONVITE PENDENTE (PRIORIDADE MÁXIMA)
+    try {
+      console.log('🔍 [AUTH] Verificando convites pendentes para:', userEmail);
+      const { data: convitesPendentes } = await supabaseAdmin
+        .from('convites')
+        .select('professor_id, token, nome, id')
+        .eq('email', userEmail)
+        .eq('usado', false)
+        .gte('expires_at', new Date().toISOString())
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (convitesPendentes && convitesPendentes.length > 0) {
+        professorIdDoConvite = convitesPendentes[0].professor_id;
+        userType = 'aluno'; // SE TEM CONVITE, É ALUNO!
+        console.log('🎉 [AUTH] CONVITE ENCONTRADO! Forçando tipo ALUNO. Professor:', professorIdDoConvite);
+      } else {
+        console.log('🔍 [AUTH] Nenhum convite encontrado, determinando tipo pelos metadados...');
+        // Só então usar metadata para determinar tipo
+        if (userMetadata.user_type) {
+          userType = userMetadata.user_type === 'teacher' ? 'professor' : 'aluno';
+        } else if (userMetadata.type) {
+          userType = userMetadata.type === 'teacher' ? 'professor' : 'aluno';
+        } else if (userEmail?.includes('aluno') || userEmail?.includes('student')) {
+          userType = 'aluno';
+        } else if (userEmail?.includes('prof') || userEmail?.includes('teacher')) {
+          userType = 'professor';
+        }
+      }
+    } catch (conviteError) {
+      console.log('⚠️ [AUTH] Erro ao verificar convites (não crítico):', conviteError);
+      // Fallback para metadata
+      if (userMetadata.user_type) {
+        userType = userMetadata.user_type === 'teacher' ? 'professor' : 'aluno';
+      } else if (userMetadata.type) {
+        userType = userMetadata.type === 'teacher' ? 'professor' : 'aluno';
+      } else if (userEmail?.includes('aluno') || userEmail?.includes('student')) {
+        userType = 'aluno';
+      } else if (userEmail?.includes('prof') || userEmail?.includes('teacher')) {
+        userType = 'professor';
+      }
     }
 
-    console.log('🎯 [AUTH] Tipo determinado:', userType, 'baseado em:', { 
+    console.log('🎯 [AUTH] Tipo FINAL determinado:', userType, 'baseado em:', { 
       email: userEmail, 
       metadata_user_type: userMetadata.user_type,
-      metadata_type: userMetadata.type 
+      metadata_type: userMetadata.type,
+      tem_convite: !!professorIdDoConvite,
+      professor_do_convite: professorIdDoConvite
     });
 
     // ✨ CRIAR PERFIL AUTOMATICAMENTE SE NÃO EXISTIR
@@ -95,32 +131,74 @@ export const authenticateToken = async (
       if (profile && !profileError) {
         profileData = profile;
         console.log('✅ [AUTH] Perfil encontrado na tabela profiles');
-        // Se encontrar na tabela, usar os dados de lá
-        userType = profile.user_type === 'teacher' || profile.user_type === 'professor' || profile.tipo === 'professor' ? 'professor' : 'aluno';
+        
+        // 🎯 CORREÇÃO AUTOMÁTICA: Se tem convite pendente mas perfil está como professor, corrigir!
+        if (professorIdDoConvite && profile.tipo === 'professor') {
+          console.log('🔧 [AUTH] CORREÇÃO AUTOMÁTICA: Perfil é professor mas tem convite pendente. Convertendo para aluno...');
+          
+          const { data: perfilCorrigido, error: correcaoError } = await supabaseAdmin
+            .from('profiles')
+            .update({
+              tipo: 'aluno',
+              user_type: 'aluno',
+              professor_id: professorIdDoConvite,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', userId)
+            .select()
+            .single();
+
+          if (correcaoError) {
+            console.error('❌ [AUTH] Erro na correção automática:', correcaoError);
+          } else {
+            console.log('✅ [AUTH] Perfil corrigido automaticamente:', perfilCorrigido);
+            profileData = perfilCorrigido;
+            userType = 'aluno';
+            
+            // Criar relacionamento na tabela alunos
+            try {
+              const { data: relacionamento, error: relError } = await supabaseAdmin
+                .from('alunos')
+                .upsert({
+                  aluno_id: userId,
+                  professor_id: professorIdDoConvite,
+                  ativo: true,
+                  created_at: new Date().toISOString(),
+                  updated_at: new Date().toISOString()
+                })
+                .select()
+                .single();
+
+              if (relError) {
+                console.error('❌ [AUTH] Erro ao criar relacionamento na correção:', relError);
+              } else {
+                console.log('✅ [AUTH] Relacionamento criado na correção automática:', relacionamento);
+              }
+
+              // Marcar convite como usado
+              await supabaseAdmin
+                .from('convites')
+                .update({
+                  usado: true,
+                  usado_em: new Date().toISOString(),
+                  aluno_id: userId,
+                  updated_at: new Date().toISOString()
+                })
+                .eq('email', userEmail)
+                .eq('usado', false);
+
+              console.log('🎉 [AUTH] CORREÇÃO AUTOMÁTICA CONCLUÍDA COM SUCESSO!');
+            } catch (relacionamentoError) {
+              console.error('⚠️ [AUTH] Erro no relacionamento da correção:', relacionamentoError);
+            }
+          }
+        } else {
+          // Se encontrar na tabela, usar os dados de lá normalmente
+          userType = profile.user_type === 'teacher' || profile.user_type === 'professor' || profile.tipo === 'professor' ? 'professor' : 'aluno';
+        }
       } else {
         console.log('⚠️ [AUTH] Perfil não encontrado, criando automaticamente...');
         
-        // 🎯 VERIFICAR SE HÁ CONVITE PENDENTE PARA ESTE EMAIL
-        let professorId = null;
-        try {
-          const { data: convitesPendentes } = await supabaseAdmin
-            .from('convites')
-            .select('professor_id, token, nome')
-            .eq('email', userEmail)
-            .eq('usado', false)
-            .gte('expires_at', new Date().toISOString())
-            .order('created_at', { ascending: false })
-            .limit(1);
-
-          if (convitesPendentes && convitesPendentes.length > 0) {
-            professorId = convitesPendentes[0].professor_id;
-            console.log('🎉 [AUTH] CONVITE ENCONTRADO! Vinculando ao professor:', professorId);
-            userType = 'aluno'; // Se tem convite, é aluno
-          }
-        } catch (conviteError) {
-          console.log('⚠️ [AUTH] Erro ao verificar convites (não crítico):', conviteError);
-        }
-
         // CRIAR PERFIL AUTOMATICAMENTE (com vinculação se houver convite)
         const { data: newProfile, error: createError } = await supabaseAdmin
           .from('profiles')
@@ -130,7 +208,7 @@ export const authenticateToken = async (
             email: userEmail,
             tipo: userType,
             user_type: userType,
-            professor_id: professorId, // 🎯 VINCULAÇÃO AUTOMÁTICA VIA CONVITE!
+            professor_id: professorIdDoConvite, // 🎯 VINCULAÇÃO AUTOMÁTICA VIA CONVITE!
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
           })
@@ -145,13 +223,13 @@ export const authenticateToken = async (
           profileData = newProfile;
 
           // 🎯 SE VINCULOU VIA CONVITE, CRIAR RELACIONAMENTO NA TABELA ALUNOS
-          if (professorId && userType === 'aluno') {
+          if (professorIdDoConvite && userType === 'aluno') {
             try {
               const { data: relacionamento, error: relError } = await supabaseAdmin
                 .from('alunos')
                 .insert({
                   aluno_id: userId,
-                  professor_id: professorId,
+                  professor_id: professorIdDoConvite,
                   ativo: true,
                   created_at: new Date().toISOString(),
                   updated_at: new Date().toISOString()

@@ -768,6 +768,144 @@ router.get('/validar-convite/:token', async (req, res) => {
   }
 });
 
+// Converter professor em aluno (quando há convite pendente)
+router.post('/converter-para-aluno', async (req: AuthRequest, res) => {
+  try {
+    console.log('=== CONVERTER PROFESSOR EM ALUNO ===');
+    
+    const user = req.user;
+    if (!user) {
+      return res.status(401).json({ 
+        success: false, 
+        error: 'Usuário não autenticado' 
+      });
+    }
+
+    console.log('🔄 Convertendo usuário:', user.id, user.email, 'de', user.tipo, 'para aluno');
+
+    // 1. Verificar se há convite pendente para este email
+    const { data: convitesPendentes, error: conviteError } = await supabaseAdmin
+      .from('convites')
+      .select('*')
+      .eq('email', user.email)
+      .eq('usado', false)
+      .gte('expires_at', new Date().toISOString())
+      .order('created_at', { ascending: false });
+
+    if (conviteError || !convitesPendentes || convitesPendentes.length === 0) {
+      console.error('❌ Nenhum convite pendente encontrado para:', user.email);
+      return res.status(404).json({
+        success: false,
+        error: 'Nenhum convite pendente encontrado para este email'
+      });
+    }
+
+    const convite = convitesPendentes[0];
+    console.log('✅ Convite encontrado:', convite.id, 'Professor:', convite.professor_id);
+
+    // 2. Atualizar perfil para aluno e vincular ao professor
+    const { data: perfilAtualizado, error: updateError } = await supabaseAdmin
+      .from('profiles')
+      .update({
+        tipo: 'aluno',
+        user_type: 'aluno',
+        professor_id: convite.professor_id,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', user.id)
+      .select()
+      .single();
+
+    if (updateError) {
+      console.error('❌ Erro ao atualizar perfil:', updateError);
+      return res.status(500).json({
+        success: false,
+        error: 'Erro ao atualizar perfil',
+        details: updateError
+      });
+    }
+
+    console.log('✅ Perfil atualizado para aluno:', perfilAtualizado);
+
+    // 3. Criar relacionamento na tabela alunos
+    const { data: relacionamento, error: relError } = await supabaseAdmin
+      .from('alunos')
+      .upsert({
+        aluno_id: user.id,
+        professor_id: convite.professor_id,
+        observacoes: convite.observacoes || null,
+        ativo: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .select()
+      .single();
+
+    if (relError) {
+      console.error('❌ Erro ao criar relacionamento:', relError);
+    } else {
+      console.log('✅ Relacionamento criado:', relacionamento);
+    }
+
+    // 4. Marcar convite como usado
+    const { error: markUsedError } = await supabaseAdmin
+      .from('convites')
+      .update({
+        usado: true,
+        usado_em: new Date().toISOString(),
+        aluno_id: user.id,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', convite.id);
+
+    if (markUsedError) {
+      console.error('⚠️ Erro ao marcar convite como usado:', markUsedError);
+    } else {
+      console.log('✅ Convite marcado como usado');
+    }
+
+    // 5. Buscar dados do professor
+    const { data: professor, error: profError } = await supabaseAdmin
+      .from('profiles')
+      .select('id, nome, email, telefone')
+      .eq('id', convite.professor_id)
+      .single();
+
+    console.log('🎉 CONVERSÃO E VINCULAÇÃO CONCLUÍDA COM SUCESSO!');
+
+    return res.json({
+      success: true,
+      message: 'Usuário convertido para aluno e vinculado com sucesso!',
+      data: {
+        aluno: {
+          id: user.id,
+          nome: perfilAtualizado.nome,
+          email: perfilAtualizado.email,
+          tipo: 'aluno',
+          professor_id: convite.professor_id
+        },
+        professor: professor || { 
+          id: convite.professor_id, 
+          nome: 'Professor' 
+        },
+        vinculacao: {
+          criada_em: new Date().toISOString(),
+          via_convite: true,
+          token_usado: convite.token
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('💥 Erro na conversão:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Erro interno do servidor',
+      details: error instanceof Error ? error.message : 'Erro desconhecido'
+    });
+  }
+});
+
 // 🔧 FUNÇÃO AUXILIAR: Buscar estatísticas reais do aluno
 async function buscarEstatisticasReais(alunoId: string) {
   try {
