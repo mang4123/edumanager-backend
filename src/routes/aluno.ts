@@ -68,6 +68,7 @@ router.get('/profile', async (req, res) => {
       email: user.email,
       telefone: user.telefone || null,
       professor: professorData ? {
+        id: alunoData.professor_id,
         nome: professorData.nome || "Professor",
         especialidade: "Ensino",
         telefone: professorData.telefone
@@ -108,9 +109,9 @@ router.get('/stats', async (req, res) => {
       success: true,
       message: "Estatísticas reais do aluno",
       data: {
-        totalMaterials: statsReais.materiaisDisponiveis,
-        totalQuestions: statsReais.duvidaTotal,
-        totalClasses: statsReais.aulasRealizadas,
+        totalMaterials: statsReais.materiaisRecebidos,
+        totalQuestions: statsReais.perguntasEnviadas,
+        totalClasses: statsReais.aulasAgendadas,
         studyHours: statsReais.horasEstudo || 0
       }
     });
@@ -121,284 +122,371 @@ router.get('/stats', async (req, res) => {
   }
 });
 
+// GET /api/aluno/materiais - Materiais do aluno (CORRIGIDO)
+router.get('/materiais', async (req, res) => {
+  try {
+    console.log('=== MATERIAIS DO ALUNO ===');
+    
+    const user = (req as any).user;
+    if (!user) {
+      return res.status(401).json({ error: 'Usuário não autenticado' });
+    }
+
+    console.log('📚 [ALUNO] Buscando materiais para:', user.id);
+
+    // 1. Buscar relacionamento aluno-professor
+    const { data: alunoData, error: alunoError } = await supabaseAdmin
+      .from('alunos')
+      .select('professor_id')
+      .eq('aluno_id', user.id)
+      .eq('ativo', true)
+      .single();
+
+    if (alunoError || !alunoData) {
+      console.log('❌ [ALUNO] Não vinculado a professor para materiais');
+      return res.json({
+        success: true,
+        message: "Aluno não vinculado a professor",
+        data: []
+      });
+    }
+
+    // 2. Buscar materiais/exercícios do professor
+    const { data: materiais, error: materiaisError } = await supabaseAdmin
+      .from('exercicios')
+      .select('*')
+      .eq('professor_id', alunoData.professor_id)
+      .order('created_at', { ascending: false });
+
+    if (materiaisError) {
+      console.log('⚠️ [ALUNO] Erro ao buscar materiais:', materiaisError);
+      return res.json({
+        success: true,
+        message: "Nenhum material encontrado",
+        data: []
+      });
+    }
+
+    console.log(`✅ [ALUNO] ${materiais?.length || 0} materiais encontrados`);
+
+    return res.json({
+      success: true,
+      message: "Materiais do aluno",
+      data: materiais || []
+    });
+
+  } catch (error) {
+    console.error('💥 [ALUNO] Erro ao buscar materiais:', error);
+    return res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// GET /api/aluno/duvidas - Dúvidas do aluno (CORRIGIDO)
+router.get('/duvidas', async (req, res) => {
+  try {
+    console.log('=== DÚVIDAS DO ALUNO ===');
+    
+    const user = (req as any).user;
+    if (!user) {
+      return res.status(401).json({ error: 'Usuário não autenticado' });
+    }
+
+    console.log('❓ [ALUNO] Buscando dúvidas para:', user.id);
+
+    // 1. Buscar relacionamento aluno-professor
+    const { data: alunoData, error: alunoError } = await supabaseAdmin
+      .from('alunos')
+      .select('professor_id')
+      .eq('aluno_id', user.id)
+      .eq('ativo', true)
+      .single();
+
+    if (alunoError || !alunoData) {
+      console.log('❌ [ALUNO] Não vinculado a professor para dúvidas');
+      return res.json({
+        success: true,
+        message: "Aluno não vinculado a professor",
+        data: {
+          professor: null,
+          duvidas: []
+        }
+      });
+    }
+
+    // 2. Buscar dados do professor
+    const { data: professorData } = await supabaseAdmin
+      .from('profiles')
+      .select('nome')
+      .eq('id', alunoData.professor_id)
+      .single();
+
+    // 3. Buscar dúvidas do aluno
+    const { data: duvidas, error: duvidasError } = await supabaseAdmin
+      .from('duvidas')
+      .select('*')
+      .eq('aluno_id', user.id)
+      .eq('professor_id', alunoData.professor_id)
+      .order('data_pergunta', { ascending: false });
+
+    if (duvidasError) {
+      console.log('⚠️ [ALUNO] Tabela dúvidas pode não existir:', duvidasError);
+    }
+
+    console.log(`✅ [ALUNO] ${duvidas?.length || 0} dúvidas encontradas`);
+
+    return res.json({
+      success: true,
+      message: "Dúvidas do aluno",
+      data: {
+        professor: {
+          id: alunoData.professor_id,
+          nome: professorData?.nome || 'Professor'
+        },
+        duvidas: duvidas || []
+      }
+    });
+
+  } catch (error) {
+    console.error('💥 [ALUNO] Erro ao buscar dúvidas:', error);
+    return res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// POST /api/aluno/duvidas - Criar nova dúvida (CORRIGIDO)
+router.post('/duvidas', async (req, res) => {
+  try {
+    console.log('=== NOVA DÚVIDA DO ALUNO ===');
+    
+    const user = (req as any).user;
+    if (!user) {
+      return res.status(401).json({ error: 'Usuário não autenticado' });
+    }
+
+    const { pergunta, assunto } = req.body;
+
+    if (!pergunta?.trim()) {
+      return res.status(400).json({ error: 'Pergunta é obrigatória' });
+    }
+
+    console.log('❓ [ALUNO] Criando dúvida para:', user.id);
+
+    // 1. Buscar relacionamento aluno-professor
+    const { data: alunoData, error: alunoError } = await supabaseAdmin
+      .from('alunos')
+      .select('professor_id')
+      .eq('aluno_id', user.id)
+      .eq('ativo', true)
+      .single();
+
+    if (alunoError || !alunoData) {
+      return res.status(400).json({ error: 'Aluno não vinculado a nenhum professor' });
+    }
+
+    // 2. Criar dúvida
+    const { data: novaDuvida, error: duvidasError } = await supabaseAdmin
+      .from('duvidas')
+      .insert([{
+        aluno_id: user.id,
+        professor_id: alunoData.professor_id,
+        pergunta: pergunta.trim(),
+        assunto: assunto?.trim() || null,
+        respondida: false,
+        data_pergunta: new Date().toISOString()
+      }])
+      .select()
+      .single();
+
+    if (duvidasError) {
+      console.error('❌ [ALUNO] Erro ao criar dúvida:', duvidasError);
+      return res.status(400).json({ error: 'Erro ao criar dúvida' });
+    }
+
+    console.log('✅ [ALUNO] Dúvida criada com sucesso');
+
+    return res.json({
+      success: true,
+      message: "Dúvida enviada com sucesso",
+      data: novaDuvida
+    });
+
+  } catch (error) {
+    console.error('💥 [ALUNO] Erro ao criar dúvida:', error);
+    return res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// GET /api/aluno/financeiro - Dados financeiros do aluno (CORRIGIDO)
+router.get('/financeiro', async (req, res) => {
+  try {
+    console.log('=== FINANCEIRO DO ALUNO ===');
+    
+    const user = (req as any).user;
+    if (!user) {
+      return res.status(401).json({ error: 'Usuário não autenticado' });
+    }
+
+    console.log('💰 [ALUNO] Buscando dados financeiros para:', user.id);
+
+    // 1. Buscar relacionamento aluno-professor
+    const { data: alunoData, error: alunoError } = await supabaseAdmin
+      .from('alunos')
+      .select('professor_id')
+      .eq('aluno_id', user.id)
+      .eq('ativo', true)
+      .single();
+
+    if (alunoError || !alunoData) {
+      console.log('❌ [ALUNO] Não vinculado a professor para financeiro');
+      return res.json({
+        success: true,
+        message: "Aluno não vinculado a professor",
+        data: {
+          professor: null,
+          resumo: {
+            totalPendente: 0,
+            totalPago: 0,
+            itensPendentes: 0,
+            itensPagos: 0
+          },
+          itens: []
+        }
+      });
+    }
+
+    // 2. Buscar dados do professor
+    const { data: professorData } = await supabaseAdmin
+      .from('profiles')
+      .select('nome')
+      .eq('id', alunoData.professor_id)
+      .single();
+
+    // 3. Buscar dados financeiros do aluno
+    const { data: financeiro, error: financeiroError } = await supabaseAdmin
+      .from('financeiro')
+      .select('*')
+      .eq('aluno_id', user.id)
+      .eq('professor_id', alunoData.professor_id)
+      .order('data_vencimento', { ascending: false });
+
+    if (financeiroError) {
+      console.log('⚠️ [ALUNO] Tabela financeiro pode não existir:', financeiroError);
+    }
+
+    // 4. Calcular resumo
+    const itens = financeiro || [];
+    const resumo = {
+      totalPendente: itens.filter(i => i.status === 'pendente').reduce((total, i) => total + (i.valor || 0), 0),
+      totalPago: itens.filter(i => i.status === 'pago').reduce((total, i) => total + (i.valor || 0), 0),
+      itensPendentes: itens.filter(i => i.status === 'pendente').length,
+      itensPagos: itens.filter(i => i.status === 'pago').length
+    };
+
+    console.log(`✅ [ALUNO] ${itens.length} itens financeiros encontrados`);
+
+    return res.json({
+      success: true,
+      message: "Dados financeiros do aluno",
+      data: {
+        professor: {
+          nome: professorData?.nome || 'Professor'
+        },
+        resumo,
+        itens
+      }
+    });
+
+  } catch (error) {
+    console.error('💥 [ALUNO] Erro ao buscar dados financeiros:', error);
+    return res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
 // 🔧 FUNÇÃO AUXILIAR: Buscar estatísticas reais do aluno
 async function buscarEstatisticasReais(alunoId: string) {
   try {
     console.log('🔍 [ESTATÍSTICAS] Buscando dados reais para aluno:', alunoId);
 
-    // 1. 📚 MATERIAIS DISPONÍVEIS (exercícios)
-    const { data: exercicios, error: exerciciosError } = await supabaseAdmin
-      .from('exercicios')
-      .select('id')
-      .order('created_at', { ascending: false });
+    // Buscar relacionamento aluno-professor primeiro
+    const { data: alunoData } = await supabaseAdmin
+      .from('alunos')
+      .select('professor_id')
+      .eq('aluno_id', alunoId)
+      .eq('ativo', true)
+      .single();
 
-    const materiaisDisponiveis = exercicios?.length || 0;
-    console.log('📚 [MATERIAIS] Total encontrado:', materiaisDisponiveis);
+    if (!alunoData) {
+      console.log('📊 [STATS] Aluno não vinculado - retornando estatísticas zeradas');
+      return {
+        materiaisRecebidos: 0,
+        perguntasEnviadas: 0,
+        aulasAgendadas: 0,
+        horasEstudo: 0
+      };
+    }
 
-    // 2. ❓ DÚVIDAS DO ALUNO
-    const { data: duvidas, error: duvidasError } = await supabaseAdmin
-      .from('duvidas')
-      .select('id, status')
-      .eq('aluno_id', alunoId);
+    const professorId = alunoData.professor_id;
+    console.log('📊 [STATS] Professor vinculado:', professorId);
 
-    const duvidaTotal = duvidas?.length || 0;
-    const duvidasPendentes = duvidas?.filter(d => d.status === 'pendente').length || 0;
-    console.log('❓ [DÚVIDAS] Total:', duvidaTotal, 'Pendentes:', duvidasPendentes);
-
-    // 3. 🎓 AULAS REALIZADAS
-    let aulasRealizadas = 0;
-    try {
-      const { data: aulas, error: aulasError } = await supabaseAdmin
-        .from('aulas')
+    // Buscar estatísticas reais em paralelo
+    const [
+      { data: exercicios },
+      { data: duvidas },
+      { data: aulas },
+      { data: pagamentos }
+    ] = await Promise.all([
+      // Materiais/exercícios disponíveis para este aluno
+      supabaseAdmin
+        .from('exercicios')
+        .select('id')
+        .eq('professor_id', professorId),
+      
+      // Dúvidas enviadas por este aluno
+      supabaseAdmin
+        .from('duvidas')
         .select('id')
         .eq('aluno_id', alunoId)
-        .eq('status', 'realizada');
-
-      aulasRealizadas = aulas?.length || 0;
-      console.log('🎓 [AULAS] Realizadas:', aulasRealizadas);
-    } catch (aulasError) {
-      console.log('⚠️ [AULAS] Tabela não encontrada, usando 0');
-    }
-
-    // 4. 💰 PAGAMENTOS
-    let proximoPagamento = null;
-    try {
-      const { data: pagamentos, error: pagamentosError } = await supabaseAdmin
-        .from('financeiro')
-        .select('*')
-        .eq('aluno_id', alunoId)
-        .eq('status', 'pendente')
-        .order('data_vencimento', { ascending: true })
-        .limit(1);
-
-      proximoPagamento = pagamentos?.[0] || null;
-      console.log('💰 [FINANCEIRO] Próximo pagamento:', proximoPagamento?.data_vencimento);
-    } catch (financeiroError) {
-      console.log('⚠️ [FINANCEIRO] Dados não encontrados');
-    }
-
-    // 5. ⏰ PRÓXIMA AULA
-    let proximaAula = null;
-    try {
-      const dataAtual = new Date().toISOString().split('T')[0];
-      const { data: proximasAulas, error: proximasAulasError } = await supabaseAdmin
+        .eq('professor_id', professorId),
+      
+      // Aulas deste aluno
+      supabaseAdmin
         .from('aulas')
-        .select('*')
+        .select('id, duracao')
         .eq('aluno_id', alunoId)
-        .gte('data', dataAtual)
-        .eq('status', 'agendada')
-        .order('data', { ascending: true })
-        .limit(1);
+        .eq('professor_id', professorId),
+      
+      // Pagamentos deste aluno
+      supabaseAdmin
+        .from('financeiro')
+        .select('id')
+        .eq('aluno_id', alunoId)
+        .eq('professor_id', professorId)
+    ]);
 
-      proximaAula = proximasAulas?.[0] || null;
-      console.log('⏰ [PRÓXIMA AULA]:', proximaAula?.data, proximaAula?.horario);
-    } catch (proximaAulaError) {
-      console.log('⚠️ [PRÓXIMA AULA] Não encontrada');
-    }
+    // Calcular horas de estudo (soma da duração das aulas)
+    const horasEstudo = (aulas || []).reduce((total: number, aula: any) => {
+      return total + (aula.duracao || 0);
+    }, 0);
 
-    const estatisticas = {
-      aulasRealizadas,
-      exerciciosPendentes: duvidasPendentes,
-      materiaisDisponiveis,
-      proximaAula: proximaAula ? {
-        data: proximaAula.data,
-        horario: proximaAula.horario,
-        materia: proximaAula.materia || 'Aula'
-      } : null,
-      duvidaTotal,
-      duvidasPendentes,
-      proximoPagamento: proximoPagamento ? {
-        valor: proximoPagamento.valor,
-        vencimento: proximoPagamento.data_vencimento
-      } : null,
-      horasEstudo: Math.floor(aulasRealizadas * 1.5) // Estimativa: 1.5h por aula
+    const stats = {
+      materiaisRecebidos: exercicios?.length || 0,
+      perguntasEnviadas: duvidas?.length || 0,
+      aulasAgendadas: aulas?.length || 0,
+      horasEstudo: Math.round(horasEstudo / 60) // Converter minutos para horas
     };
 
-    console.log('✅ [ESTATÍSTICAS REAIS] Calculadas:', estatisticas);
-    return estatisticas;
+    console.log('📊 [STATS] Estatísticas calculadas:', stats);
+    return stats;
 
   } catch (error) {
-    console.error('💥 [ESTATÍSTICAS] Erro ao buscar dados reais:', error);
-    // Retornar valores padrão em caso de erro
+    console.error('💥 [STATS] Erro ao buscar estatísticas:', error);
+    // Retornar estatísticas zeradas em caso de erro
     return {
-      aulasRealizadas: 0,
-      exerciciosPendentes: 0,
-      materiaisDisponiveis: 0,
-      proximaAula: null,
-      duvidaTotal: 0,
-      duvidasPendentes: 0,
-      proximoPagamento: null,
+      materiaisRecebidos: 0,
+      perguntasEnviadas: 0,
+      aulasAgendadas: 0,
       horasEstudo: 0
     };
   }
 }
-
-// GET /api/aluno/materiais - Lista de materiais do aluno (REAL)
-router.get('/materiais', async (req, res) => {
-  try {
-    const user = (req as any).user;
-    if (!user) {
-      return res.status(401).json({ error: 'Usuário não autenticado' });
-    }
-
-    console.log('📚 [MATERIAIS] Buscando materiais reais para:', user.id);
-
-    // Buscar exercícios do banco
-    const { data: exercicios, error } = await supabaseAdmin
-      .from('exercicios')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('❌ [MATERIAIS] Erro ao buscar exercícios:', error);
-    }
-
-    const materiais = exercicios?.map(ex => ({
-      id: ex.id,
-      titulo: ex.titulo,
-      descricao: ex.descricao,
-      tipo: 'exercicio',
-      materia: ex.materia,
-      professor: 'Professor',
-      dataEnvio: ex.created_at?.split('T')[0],
-      prazo: ex.prazo,
-      status: 'disponivel',
-      arquivo: ex.anexo_url
-    })) || [];
-
-    console.log('✅ [MATERIAIS] Total encontrado:', materiais.length);
-
-    return res.json({
-      message: "Lista real de materiais do aluno",
-      data: materiais
-    });
-
-  } catch (error) {
-    console.error('💥 [MATERIAIS] Erro ao buscar materiais:', error);
-    return res.status(500).json({ error: 'Erro interno do servidor' });
-  }
-});
-
-// GET /api/aluno/duvidas - Dúvidas do aluno (REAL)
-router.get('/duvidas', async (req, res) => {
-  try {
-    const user = (req as any).user;
-    if (!user) {
-      return res.status(401).json({ error: 'Usuário não autenticado' });
-    }
-
-    console.log('❓ [DÚVIDAS] Buscando dúvidas reais para:', user.id);
-
-    const { data: duvidas, error } = await supabaseAdmin
-      .from('duvidas')
-      .select('*')
-      .eq('aluno_id', user.id)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('❌ [DÚVIDAS] Erro ao buscar dúvidas:', error);
-    }
-
-    console.log('✅ [DÚVIDAS] Total encontrado:', duvidas?.length || 0);
-
-    return res.json({
-      message: "Dúvidas reais do aluno",
-      data: duvidas || []
-    });
-
-  } catch (error) {
-    console.error('💥 [DÚVIDAS] Erro ao buscar dúvidas:', error);
-    return res.status(500).json({ error: 'Erro interno do servidor' });
-  }
-});
-
-// GET /api/aluno/financeiro - Dados financeiros do aluno (REAL)
-router.get('/financeiro', async (req, res) => {
-  try {
-    const user = (req as any).user;
-    if (!user) {
-      return res.status(401).json({ error: 'Usuário não autenticado' });
-    }
-
-    console.log('💰 [FINANCEIRO] Buscando dados reais para:', user.id);
-
-    const { data: pagamentos, error } = await supabaseAdmin
-      .from('financeiro')
-      .select('*')
-      .eq('aluno_id', user.id)
-      .order('data_vencimento', { ascending: false });
-
-    if (error) {
-      console.error('❌ [FINANCEIRO] Erro ao buscar dados financeiros:', error);
-    }
-
-    // Calcular próximo pagamento
-    const proximoPagamento = pagamentos?.find(p => p.status === 'pendente') || null;
-
-    const dadosFinanceiros = {
-      proximoPagamento,
-      historico: pagamentos || []
-    };
-
-    console.log('✅ [FINANCEIRO] Pagamentos encontrados:', pagamentos?.length || 0);
-
-    return res.json({
-      message: "Dados financeiros reais do aluno",
-      data: dadosFinanceiros
-    });
-
-  } catch (error) {
-    console.error('💥 [FINANCEIRO] Erro ao buscar dados financeiros:', error);
-    return res.status(500).json({ error: 'Erro interno do servidor' });
-  }
-});
-
-// POST /api/aluno/duvidas - Criar nova dúvida
-router.post('/duvidas', async (req, res) => {
-  try {
-    const user = (req as any).user;
-    if (!user) {
-      return res.status(401).json({ error: 'Usuário não autenticado' });
-    }
-
-    const { assunto, pergunta, materia, urgencia } = req.body;
-
-    if (!assunto || !pergunta) {
-      return res.status(400).json({ error: 'Assunto e pergunta são obrigatórios' });
-    }
-
-    console.log('➕ [NOVA DÚVIDA] Criando para:', user.id, 'Assunto:', assunto);
-
-    const { data: novaDuvida, error } = await supabaseAdmin
-      .from('duvidas')
-      .insert({
-        aluno_id: user.id,
-        professor_id: 'e650f5ee-747b-4574-9bfa-8e2d411c4974',
-        assunto,
-        pergunta,
-        materia: materia || 'Geral',
-        urgencia: urgencia || 'normal',
-        status: 'pendente'
-      })
-      .select()
-      .single();
-
-    if (error) {
-      console.error('❌ [NOVA DÚVIDA] Erro ao criar dúvida:', error);
-      return res.status(500).json({ error: 'Erro ao criar dúvida' });
-    }
-
-    console.log('✅ [NOVA DÚVIDA] Criada com sucesso:', novaDuvida.id);
-
-    return res.json({
-      message: 'Dúvida enviada com sucesso',
-      data: novaDuvida
-    });
-
-  } catch (error) {
-    console.error('💥 [NOVA DÚVIDA] Erro ao criar dúvida:', error);
-    return res.status(500).json({ error: 'Erro interno do servidor' });
-  }
-});
 
 export default router; 
