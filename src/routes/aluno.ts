@@ -1,18 +1,22 @@
 import { Router } from 'express';
 import { supabaseAdmin } from '../config/supabase';
+import { authenticateToken, requireRole, AuthRequest } from '../middleware/auth';
 
 const router = Router();
+
+// Aplicar autenticação em todas as rotas
+router.use(authenticateToken);
 
 // ==========================================
 // ROTAS ALUNO - DADOS REAIS DO BANCO
 // ==========================================
 
 // GET /api/aluno/profile - Perfil do aluno
-router.get('/profile', async (req, res) => {
+router.get('/profile', async (req: AuthRequest, res) => {
   try {
     console.log('=== PERFIL DO ALUNO (DADOS REAIS) ===');
     
-    const user = (req as any).user;
+    const user = req.user;
     if (!user) {
       return res.status(401).json({ error: 'Usuário não autenticado' });
     }
@@ -89,11 +93,11 @@ router.get('/profile', async (req, res) => {
 });
 
 // 🔥 ROTA ATUALIZADA: GET /api/aluno/stats - Estatísticas REAIS do aluno
-router.get('/stats', async (req, res) => {
+router.get('/stats', async (req: AuthRequest, res) => {
   try {
     console.log('=== ESTATÍSTICAS REAIS DO ALUNO ===');
     
-    const user = (req as any).user;
+    const user = req.user;
     if (!user) {
       return res.status(401).json({ error: 'Usuário não autenticado' });
     }

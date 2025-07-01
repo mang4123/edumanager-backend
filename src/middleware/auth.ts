@@ -81,10 +81,10 @@ export const authenticateToken = async (
       metadata_type: userMetadata.type 
     });
 
-    // ✨ TENTATIVA DE BUSCAR NA TABELA PROFILES (mas não é obrigatório)
+    // ✨ CRIAR PERFIL AUTOMATICAMENTE SE NÃO EXISTIR
     let profileData = null;
     try {
-      console.log('🔍 [AUTH] Tentando buscar perfil na tabela profiles...');
+      console.log('🔍 [AUTH] Verificando se perfil existe na tabela profiles...');
       
       const { data: profile, error: profileError } = await supabaseAdmin
         .from('profiles')
@@ -96,12 +96,35 @@ export const authenticateToken = async (
         profileData = profile;
         console.log('✅ [AUTH] Perfil encontrado na tabela profiles');
         // Se encontrar na tabela, usar os dados de lá
-        userType = profile.user_type === 'teacher' || profile.user_type === 'professor' ? 'professor' : 'aluno';
+        userType = profile.user_type === 'teacher' || profile.user_type === 'professor' || profile.tipo === 'professor' ? 'professor' : 'aluno';
       } else {
-        console.log('⚠️ [AUTH] Perfil não encontrado na tabela profiles, usando dados do token');
+        console.log('⚠️ [AUTH] Perfil não encontrado, criando automaticamente...');
+        
+        // CRIAR PERFIL AUTOMATICAMENTE
+        const { data: newProfile, error: createError } = await supabaseAdmin
+          .from('profiles')
+          .insert({
+            id: userId,
+            nome: userMetadata.name || userEmail.split('@')[0] || (userType === 'professor' ? 'Professor' : 'Aluno'),
+            email: userEmail,
+            tipo: userType,
+            user_type: userType,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .select()
+          .single();
+
+        if (createError) {
+          console.error('❌ [AUTH] Erro ao criar perfil automaticamente:', createError);
+          // Não é erro crítico - continua sem perfil na tabela
+        } else {
+          console.log('✅ [AUTH] Perfil criado automaticamente:', newProfile);
+          profileData = newProfile;
+        }
       }
     } catch (profileError) {
-      console.log('⚠️ [AUTH] Erro ao buscar perfil (não crítico):', profileError);
+      console.log('⚠️ [AUTH] Erro ao verificar/criar perfil (não crítico):', profileError);
       // Não é erro crítico - continua com dados do token
     }
 
