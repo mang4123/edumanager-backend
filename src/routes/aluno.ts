@@ -23,6 +23,95 @@ router.get('/profile', async (req: AuthRequest, res) => {
 
     console.log('👤 [ALUNO] Buscando perfil para:', user.id, user.email);
 
+    // 🔥 PRIMEIRO: VERIFICAR SE HÁ CONVITES PENDENTES PARA ESTE USUÁRIO
+    console.log('🔍 [ALUNO] Verificando convites pendentes para:', user.email);
+    
+    const { data: convitesPendentes, error: convitesError } = await supabaseAdmin
+      .from('convites')
+      .select('*')
+      .eq('email_aluno', user.email)
+      .eq('usado', false)
+      .order('created_at', { ascending: false });
+
+    if (convitesPendentes && convitesPendentes.length > 0) {
+      const convite = convitesPendentes[0]; // Pegar o convite mais recente
+      console.log('🎯 [ALUNO] CONVITE PENDENTE ENCONTRADO! Vinculando automaticamente...', convite);
+      
+      try {
+        // 1. Verificar se já existe perfil na tabela profiles
+        const { data: perfilExistente } = await supabaseAdmin
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+
+        // 2. Criar/atualizar perfil como aluno
+        const perfilAluno = {
+          id: user.id,
+          email: user.email,
+          nome: user.nome || convite.nome_aluno || 'Aluno',
+          telefone: user.telefone || convite.telefone_aluno || null,
+          tipo: 'aluno', // FORÇA COMO ALUNO
+          professor_id: convite.professor_id,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+
+        if (perfilExistente) {
+          // Atualizar perfil existente
+          await supabaseAdmin
+            .from('profiles')
+            .update({
+              tipo: 'aluno',
+              professor_id: convite.professor_id,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', user.id);
+          console.log('✅ [ALUNO] Perfil atualizado para aluno');
+        } else {
+          // Criar novo perfil
+          await supabaseAdmin
+            .from('profiles')
+            .insert(perfilAluno);
+          console.log('✅ [ALUNO] Novo perfil criado como aluno');
+        }
+
+        // 3. Criar relacionamento na tabela alunos
+        const { data: alunoExistente } = await supabaseAdmin
+          .from('alunos')
+          .select('*')
+          .eq('aluno_id', user.id)
+          .single();
+
+        if (!alunoExistente) {
+          await supabaseAdmin
+            .from('alunos')
+            .insert({
+              aluno_id: user.id,
+              professor_id: convite.professor_id,
+              ativo: true,
+              created_at: new Date().toISOString()
+            });
+          console.log('✅ [ALUNO] Relacionamento aluno-professor criado');
+        }
+
+        // 4. Marcar convite como usado
+        await supabaseAdmin
+          .from('convites')
+          .update({ 
+            usado: true, 
+            usado_em: new Date().toISOString() 
+          })
+          .eq('id', convite.id);
+        console.log('✅ [ALUNO] Convite marcado como usado');
+
+        console.log('🎉 [ALUNO] VINCULAÇÃO AUTOMÁTICA CONCLUÍDA!');
+        
+      } catch (vinculacaoError) {
+        console.error('💥 [ALUNO] Erro na vinculação automática:', vinculacaoError);
+      }
+    }
+
     // Buscar dados reais do aluno - Query SIMPLIFICADA
     const { data: alunoData, error: alunoError } = await supabaseAdmin
       .from('alunos')
