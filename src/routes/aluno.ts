@@ -26,12 +26,66 @@ router.get('/profile', async (req: AuthRequest, res) => {
     // 🔥 PRIMEIRO: VERIFICAR SE HÁ CONVITES PENDENTES PARA ESTE USUÁRIO
     console.log('🔍 [ALUNO] Verificando convites pendentes para:', user.email);
     
+    // 🧪 TESTE: Criar convite temporário se não existir (APENAS PARA NATALIA)
+    if (user.email === 'nataliapereira@gmail.com') {
+      console.log('🧪 [TESTE] Verificando/criando convite para Natalia...');
+      
+      try {
+        // Verificar se já existe professor de teste
+        let { data: professorTeste, error: profError } = await supabaseAdmin
+          .from('profiles')
+          .select('*')
+          .eq('email', 'professor@teste.com')
+          .single();
+        
+        if (!professorTeste) {
+          console.log('🔨 [TESTE] Criando professor de teste...');
+          const { data: novoProfessor, error: errorCriarProf } = await supabaseAdmin
+            .from('profiles')
+            .insert({
+              id: 'prof-teste-' + Date.now(),
+              email: 'professor@teste.com',
+              nome: 'Professor Teste',
+              tipo: 'professor',
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            })
+            .select()
+            .single();
+            
+          if (!errorCriarProf) {
+            professorTeste = novoProfessor;
+            console.log('✅ [TESTE] Professor de teste criado:', professorTeste.id);
+          }
+        }
+        
+        if (professorTeste) {
+          // Criar convite de teste
+          console.log('🔨 [TESTE] Criando convite de teste...');
+          await supabaseAdmin
+            .from('convites')
+            .insert({
+              professor_id: professorTeste.id,
+              nome_aluno: 'Natalia Pereira',
+              email_aluno: 'nataliapereira@gmail.com',
+              telefone_aluno: '19993327886',
+              token: 'teste-natalia-' + Date.now(),
+              usado: false,
+              created_at: new Date().toISOString()
+            });
+          console.log('✅ [TESTE] Convite de teste criado!');
+        }
+      } catch (testeError) {
+        console.log('⚠️ [TESTE] Erro ao criar dados de teste:', testeError);
+      }
+    }
+    
     const { data: convitesPendentes, error: convitesError } = await supabaseAdmin
       .from('convites')
       .select('*')
       .eq('email_aluno', user.email)
       .eq('usado', false)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false});
 
     if (convitesPendentes && convitesPendentes.length > 0) {
       const convite = convitesPendentes[0]; // Pegar o convite mais recente
