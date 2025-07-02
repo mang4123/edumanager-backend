@@ -133,10 +133,22 @@ app.use(cors({
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  preflightContinue: false,
+  optionsSuccessStatus: 200
 }));
 
-app.use(helmet());
+// Middleware de debug para CORS
+app.use((req, res, next) => {
+  console.log(`🌐 [CORS] ${req.method} ${req.path} - Origin: ${req.headers.origin}`);
+  next();
+});
+
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  crossOriginEmbedderPolicy: false
+}));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
