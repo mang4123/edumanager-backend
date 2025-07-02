@@ -175,6 +175,16 @@ app.get('/health', (req, res) => {
   });
 });
 
+// === ROTA OPTIONS GLOBAL ===
+app.options('*', (req, res) => {
+  console.log(`🔄 [OPTIONS] Preflight request para: ${req.path} de origem: ${req.headers.origin}`);
+  res.header('Access-Control-Allow-Origin', req.headers.origin);
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.sendStatus(200);
+});
+
 // === ROTAS PRINCIPAIS ===
 // app.use('/api/auth', authRoutes); // Removido - usando Supabase Auth diretamente
 app.use('/api/professor', authenticateToken, requireRole(['professor']), professorRoutes);
